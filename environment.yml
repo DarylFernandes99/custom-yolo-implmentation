@@ -254,4 +254,4 @@ dependencies:
       - simsimd==6.5.3
       - stringzilla==4.2.3
       - typing-inspection==0.4.2
-prefix: /opt/anaconda3/envs/hpc_project
+prefix: C:\Users\daryl\anaconda3\envs\hpc_project
