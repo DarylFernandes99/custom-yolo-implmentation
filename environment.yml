@@ -9,4 +9,6 @@ dependencies:
   - pytorch::pytorch==2.5.1
   - dask
   - pyarrow
+  - conda-forge::matplotlib
+  - conda-forge::pycocotools
 prefix: /home/cuda/anaconda3/envs/hpc_project
