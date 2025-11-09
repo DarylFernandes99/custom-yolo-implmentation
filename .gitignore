@@ -212,3 +212,4 @@ dataset/
 # Misc
 .DS_Store
 *.docx
+*.parquet
