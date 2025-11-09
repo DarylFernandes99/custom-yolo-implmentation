@@ -34,8 +34,8 @@ class DaskPreprocessor:
         print("Loading image metadata...")
         df_parts = list(self.stream_array("images", chunk_size=10_000))
         image_ddf = ddf.from_pandas(pd.concat(df_parts, ignore_index=True), npartitions=len(df_parts))    
-        image_ddf = image_ddf.drop(columns=["license", "coco_url", "date_captured"], errors="ignore")
-        image_ddf = image_ddf.rename(columns={"id": "image_id"})[["image_id", "file_name", "height", "width", "flickr_url"]]
+        image_ddf = image_ddf.drop(columns=["license", "coco_url", "date_captured", "flickr_url"], errors="ignore")
+        image_ddf = image_ddf.rename(columns={"id": "image_id"})[["image_id", "file_name", "height", "width"]]
         print(f"Loaded {len(image_ddf)} image metadata records after cleaning.")
         return image_ddf
 
