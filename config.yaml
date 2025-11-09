@@ -1,0 +1,119 @@
+# ============================================================
+#  GLOBAL PROJECT CONFIGURATION
+# ============================================================
+
+project:
+  name: "multi_class_object_detection"
+  description: "Multi-class object detection using Dask → Parquet → FSDP"
+  seed: 42
+  num_classes: 172
+  device: "cuda"
+  distributed: true
+  mixed_precision: true
+  output_dir: "experiments"
+  log_dir: "experiments/run_logs"
+  checkpoint_dir: "experiments/checkpoints"
+  profile_dir: "experiments/profiles"
+
+# ============================================================
+#  DATA CONFIGURATION
+# ============================================================
+
+data:
+  root_dir: "dataset"
+  raw_dir: "dataset/raw"
+  processed_dir: "dataset/processed/parquet"
+  metadata_dir: "dataset/processed/metadata"
+  samples_dir: "dataset/samples"
+
+  train_parquet: "dataset/processed/parquet/annotations_train.parquet"
+  val_parquet: "dataset/processed/parquet/annotations_val.parquet"
+
+  train_images: "dataset/raw/images/train"
+  val_images: "dataset/raw/images/val"
+  test_images: "dataset/raw/images/test"
+
+  num_workers: 8
+  pin_memory: true
+  prefetch_factor: 2
+
+# ============================================================
+#  MODEL CONFIGURATION
+# ============================================================
+
+model:
+  backbone: "resnet50"             # can later switch to swin_transformer, mobilenet, etc.
+  pretrained: true
+  input_size: [640, 640]
+  feature_channels: [128, 256, 512]
+  detection_head_channels: 256
+  num_classes: 172
+
+# ============================================================
+#  TRAINING CONFIGURATION
+# ============================================================
+
+training:
+  batch_size: 16
+  epochs: 20
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  optimizer: "adamw"
+  scheduler: "reduce_on_plateau"
+  grad_clip: 1.0
+  early_stopping_patience: 5
+  learning_rate_patience: 3
+  learning_rate_factor: 0.5
+
+  # FSDP / Distributed
+  fsdp:
+    use_fsdp: true
+    sharding_strategy: "FULL_SHARD"
+    auto_wrap_policy_min_params: 10000000
+    mixed_precision: true
+
+  # Training weights
+  weights:
+    cls_loss: 1.0
+    bbox_loss: 1.0
+    mask_loss: 0.5   # optional (if segmentation enabled)
+
+# ============================================================
+#  METRICS CONFIGURATION
+# ============================================================
+
+metrics:
+  - precision
+  - recall
+  - f1_score
+  - mAP
+  - loss_curve
+  - learning_rate
+  - gpu_memory_usage
+
+# ============================================================
+#  WANDB CONFIGURATION
+# ============================================================
+
+wandb:
+  enable: true
+  project_name: "object_detection_fsdp"
+  entity: "your_wandb_username"         # <-- replace with your wandb username/team
+  run_name: "fsdp_training_run"
+  log_frequency: 20                     # log every N steps
+  mode: "online"                        # "online" | "offline" | "disabled"
+
+# ============================================================
+#  CHECKPOINT & LOGGING CONFIGURATION
+# ============================================================
+
+checkpoint:
+  save_interval: 1                      # save every N epochs
+  resume_training: false
+  best_model_metric: "val/loss"
+  best_model_mode: "min"
+
+logging:
+  console_log: true
+  file_log: true
+  log_level: "INFO"
