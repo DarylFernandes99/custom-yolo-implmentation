@@ -6,7 +6,15 @@ dependencies:
   - python=3.12
   - jupyter
   - opencv==4.10.0
-  - pytorch::pytorch==2.5.1
+  - pytorch==2.5.1
   - dask
   - pyarrow
+  - conda-forge::matplotlib
+  - conda-forge::pycocotools
+  - mkl==2024.0
+  - conda-forge::torchvision
+  - conda-forge::torchinfo
+  - pip:
+    - graphviz==0.21
+    - torchview==0.2.7
 prefix: /home/cuda/anaconda3/envs/hpc_project
