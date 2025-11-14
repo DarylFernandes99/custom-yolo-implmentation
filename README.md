@@ -14,3 +14,8 @@ conda env export --from-history > environment.yml
 conda env create -f environment.yml
 conda activate hpc_project
 ```
+
+References:
+https://www.analyticsvidhya.com/blog/2025/01/yolov11-model-building/
+https://github.com/ultralytics/ultralytics/
+https://learnopencv.com/yolo-loss-function-gfl-vfl-loss/

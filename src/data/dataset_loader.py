@@ -35,7 +35,7 @@ class DetectionDataset(Dataset):
     Each row in the Parquet file corresponds to one image.
     """
 
-    def __init__(self, parquet_path, image_dir, transform=None):
+    def __init__(self, parquet_path, image_dir, transform=None, isTest=False):
         """
         Args:
             parquet_path (str): Path to the parquet file (train/val).
@@ -45,6 +45,9 @@ class DetectionDataset(Dataset):
         # Load parquet file into memory (each row = one image)
         self.df = pd.read_parquet(parquet_path)
         print("[INFO] Loaded parquet file - {}".format(parquet_path))
+        if isTest:
+            self.df = self.df.head(500)
+            print("[INFO] Reducing data for test")
         self.image_dir = image_dir
         self.transform = transform
         self.num_workers = get_num_workers()
@@ -68,6 +71,7 @@ class DetectionDataset(Dataset):
         # Extract annotations
         boxes = torch.as_tensor(row["bbox"], dtype=torch.float32)
         labels = torch.as_tensor(row["category_id"], dtype=torch.int64)
+        labels = labels.unsqueeze(-1).reshape(labels.shape[0], 1)
 
         boxes = tv_tensors.BoundingBoxes(
             boxes,
@@ -82,11 +86,14 @@ class DetectionDataset(Dataset):
         target = {
             "boxes": boxes,
             "labels": labels,
-            "image_id": torch.tensor([idx]),
+            "image_id": torch.tensor([idx])
         }
 
         # Apply transforms
         if self.transform is not None:
             image, target = self.transform(image, target)
+        
+        target['boxes'] = torch.cat([target['boxes'], target['labels']], dim=1)
+        del target['labels']
 
         return image, target
