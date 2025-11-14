@@ -16,4 +16,10 @@ def init_distributed_mode():
         backend="nccl", init_method="env://", world_size=world_size, rank=rank
     )
     dist.barrier()
+    print("[INFO] Distirbuted process group initialized")
     return rank, world_size, gpu
+
+def cleanup_distribute_mode():
+    if dist.is_initialized():
+        dist.destroy_process_group()
+        print("[INFO] Distirbuted process group destroyed")

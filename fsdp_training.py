@@ -1,15 +1,21 @@
 import time
 import wandb
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+import itertools
+from torch.distributed.fsdp import fully_shard
+# from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
 
 from src.model.model_builder import Model
 from src.model.losses import YoloDFLQFLoss
 from src.training.train_model import train
 from src.utils.config_loader import load_config
+from src.training.wandb_setup import setup_wandb
 from src.data.data_loader import get_data_loaders
 from src.training.utils_train import get_optimizer
-from src.training.distributed_setup import init_distributed_mode
+from src.training.distributed_setup import init_distributed_mode, cleanup_distribute_mode
+
+def custom_full_shard(module: nn.Module):
+    return fully_shard(module, reshard_after_forward=True)
 
 
 def prepare_fsdp_model(model, device_id):
@@ -23,10 +29,23 @@ def prepare_fsdp_model(model, device_id):
     Returns:
         FSDP-wrapped model
     """
-    auto_wrap_policy = size_based_auto_wrap_policy(min_num_params=1e7)
-    model = model.to(device_id)
-    fsdp_model = FSDP(model, auto_wrap_policy=auto_wrap_policy, mixed_precision=True)
-    return fsdp_model
+    # model = model.to(device_id)
+    # auto_wrap_policy = size_based_auto_wrap_policy(min_num_params=1e7)
+    # model = FSDP(model, auto_wrap_policy=auto_wrap_policy, mixed_precision=True)
+
+    with torch.device("meta"):
+        model = model()
+    for module in model.modules():
+        custom_full_shard(module)
+    custom_full_shard(model)
+    for tensor in itertools.chain(model.parameters(), model.buffers()):
+        assert tensor.device == torch.device("meta")
+
+    # Initialize the model after sharding
+    model.to_empty(device=device_id)
+    model.reset_parameters()
+
+    return model
 
 
 def main():
@@ -42,7 +61,7 @@ def main():
     rank, world_size, gpu = init_distributed_mode()
     
     # Initialize Weights & Biases (only on rank 0)
-    use_wandb = cfg.get("wandb", {}).get("enabled", True)
+    use_wandb = cfg.get("wandb", {}).get("enabled", False)
     wandb_run = None
     
     if rank == 0 and use_wandb:
@@ -51,14 +70,10 @@ def main():
             "gpu": world_size,
             **training_cfg
         }
-        wandb_run = wandb.init(
-            project=wandb_config['project_name'],
-            name=f"{wandb_config['run_name']}_{int(time.time())}",
-            config=config
-        )
+        wandb_run = setup_wandb(config, wandb_config)
     
     # Create model
-    model = Model(num_classes=model_cfg.get('num_classes', 172))
+    model = Model(**model_cfg['config'], num_classes=model_cfg.get('num_classes', 172))
     fsdp_model = prepare_fsdp_model(model, gpu)
     
     # Get data loaders
@@ -109,7 +124,8 @@ def main():
     # Cleanup
     if rank == 0 and use_wandb and wandb_run:
         wandb.finish()
-
+    
+    cleanup_distribute_mode()
 
 if __name__ == "__main__":
     main()

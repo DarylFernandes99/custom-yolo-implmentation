@@ -216,3 +216,6 @@ dataset/
 
 # Model checkpoints
 *.pth
+
+# WandDB
+wandb/

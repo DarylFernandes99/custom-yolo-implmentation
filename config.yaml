@@ -42,12 +42,14 @@ data:
 # ============================================================
 
 model:
-  backbone: "resnet50"             # can later switch to swin_transformer, mobilenet, etc.
-  pretrained: true
   input_size: [640, 640]
-  feature_channels: [128, 256, 512]
-  detection_head_channels: 256
   num_classes: 172
+
+  # config: {'csp': [False, True], 'depth' : [1, 1, 1, 1, 1, 1], 'width' : [3, 16, 32, 64, 128, 256]}
+  # config: {'csp': [False, True], 'depth' : [1, 1, 1, 1, 1, 1], 'width' : [3, 32, 64, 128, 256, 512]}
+  # config: {'csp': [True, True], 'depth' : [1, 1, 1, 1, 1, 1], 'width' : [3, 64, 128, 256, 512, 512]}
+  # config: {'csp': [True, True], 'depth' : [2, 2, 2, 2, 2, 2], 'width' : [3, 64, 128, 256, 512, 512]}
+  config: {'csp': [True, True], 'depth' : [2, 2, 2, 2, 2, 2], 'width' : [3, 96, 192, 384, 768, 768]}
 
 # ============================================================
 #  TRAINING CONFIGURATION
@@ -97,10 +99,10 @@ metrics:
 
 wandb:
   enable: true
-  project_name: "object_detection_fsdp"
-  entity: "your_wandb_username"         # <-- replace with your wandb username/team
+  project_name: "hpc_project"
+  entity: "daryl99"         # <-- replace with your wandb username/team
   run_name: "fsdp_training_run"
-  log_frequency: 20                     # log every N steps
+  log_frequency: 1                     # log every N steps
   mode: "online"                        # "online" | "offline" | "disabled"
 
 # ============================================================

@@ -46,7 +46,7 @@ class DetectionDataset(Dataset):
         self.df = pd.read_parquet(parquet_path)
         print("[INFO] Loaded parquet file - {}".format(parquet_path))
         if isTest:
-            self.df = self.df.head(500)
+            self.df = self.df.head(100)
             print("[INFO] Reducing data for test")
         self.image_dir = image_dir
         self.transform = transform
