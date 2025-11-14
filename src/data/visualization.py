@@ -80,23 +80,27 @@ def visualize_comparison(image, target, prediction=None):
     Visualize image, ground truth boxes, and predicted boxes side-by-side.
     
     Args:
-        image: Image tensor data.
-        target: Target data.
+        image torch.tensor: Image tensor data.
+        target dict: Target data with 'boxes' tensor of shape [N, 5] where columns are [x, y, w, h, class_id]
         prediction (dict, optional): Model output with keys:
-            - 'boxes': tensor of shape [N, 4]
-            - 'labels': tensor of shape [N]
-            - 'scores': tensor of shape [N]
+            - 'boxes': tensor of shape [N, 5] where columns are [x, y, w, h, class_id]
+            - 'scores': tensor of shape [N] (optional)
     """
-    print(target["boxes"])
-    boxes_gt = target["boxes"].cpu().numpy()
-    labels_gt = target["labels"].cpu().numpy()
+    # Split boxes and classes from target
+    boxes_with_classes = target["boxes"].cpu().numpy()
+    boxes_gt = boxes_with_classes[:, :4]  # [x, y, w, h]
+    labels_gt = boxes_with_classes[:, 4].astype(int)  # [class_id]
 
     # Convert prediction tensors to numpy
     boxes_pred, labels_pred, scores_pred = None, None, None
     if prediction is not None:
-        boxes_pred = prediction["boxes"].detach().cpu().numpy()
-        labels_pred = prediction["labels"].detach().cpu().numpy()
-        scores_pred = prediction["scores"].detach().cpu().numpy()
+        boxes_with_classes_pred = prediction["boxes"].detach().cpu().numpy()
+        boxes_pred = boxes_with_classes_pred[:, :4]  # [x, y, w, h]
+        labels_pred = boxes_with_classes_pred[:, 4].astype(int)  # [class_id]
+        
+        # Scores are optional
+        if "scores" in prediction:
+            scores_pred = prediction["scores"].detach().cpu().numpy()
 
     # Plot raw image
     show_image(image, title="Raw Image")
