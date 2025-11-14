@@ -1,20 +1,25 @@
 name: hpc_project
 channels:
-  - conda-forge
   - defaults
 dependencies:
   - python=3.12
-  - jupyter
-  - opencv==4.10.0
   - pytorch==2.5.1
-  - dask
-  - pyarrow
-  - conda-forge::matplotlib
-  - conda-forge::pycocotools
-  - mkl==2024.0
-  - conda-forge::torchvision
+  - torchvision==0.20.1
+  - matplotlib==3.10.8
+  - conda-forge::tqdm
+  - pyyaml==6.0.2
+  - opencv==4.10.0
   - conda-forge::torchinfo
+  - ipykernel
+  - jupyterlab
+  - notebook
+  - jupyter
+  - conda-forge::pandas
+  - conda-forge::pycocotools
+  - pyarrow
+  - dask
+  - conda-forge::wandb
   - pip:
     - graphviz==0.21
     - torchview==0.2.7
-prefix: /home/cuda/anaconda3/envs/hpc_project
+prefix: /opt/anaconda3/envs/hpc_project

@@ -142,7 +142,7 @@ def train(
                 "Cls": f"{avg_cls_loss:.4f}"
             })
             
-            if use_wandb and rank == 0 and batch_idx % log_interval == 0:
+            if use_wandb and rank == 0 and batch_idx % log_interval == 0 and wandb_instance is not None:
                 step = epoch * len(train_loader) + batch_idx
                 wandb_instance.log({
                     "train/total_loss": loss_dict['total_loss'],
