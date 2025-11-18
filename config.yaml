@@ -56,8 +56,9 @@ model:
 # ============================================================
 
 training:
-  batch_size: 16
-  epochs: 20
+  is_test: true
+  batch_size: 4
+  epochs: 3
   learning_rate: 0.0001
   weight_decay: 0.0001
   optimizer: "adamw"
@@ -72,7 +73,7 @@ training:
     use_fsdp: true
     sharding_strategy: "FULL_SHARD"
     auto_wrap_policy_min_params: 10000000
-    mixed_precision: true
+    precision: "float32"   # One of ("bfloat16", "float16", "float32")
 
   # Training weights
   weights:

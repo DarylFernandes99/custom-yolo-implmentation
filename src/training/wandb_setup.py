@@ -9,5 +9,6 @@ def setup_wandb(config: Dict[str, Union[str, int, float]], wandb_config: Dict[st
         name=f"{wandb_config['run_name']}_{int(time.time())}",
         config=config
     )
+    print("[INFO] WanDB Initialzed")
 
     return wandb_run
