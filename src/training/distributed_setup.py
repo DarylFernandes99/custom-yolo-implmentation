@@ -8,14 +8,14 @@ def init_distributed_mode():
         world_size = int(os.environ["WORLD_SIZE"])
         gpu = int(os.environ["LOCAL_RANK"])
     else:
-        print("Not using distributed mode")
+        print("[WARNING] Not using distributed mode")
         rank, world_size, gpu = 0, 1, 0
 
     torch.cuda.set_device(gpu)
     dist.init_process_group(
         backend="nccl", init_method="env://", world_size=world_size, rank=rank
     )
-    dist.barrier()
+    dist.barrier(device_ids=[int(rank)])
     print("[INFO] Distirbuted process group initialized")
     return rank, world_size, gpu
 
