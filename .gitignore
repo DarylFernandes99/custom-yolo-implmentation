@@ -213,6 +213,7 @@ dataset/
 .DS_Store
 *.docx
 *.parquet
+*.svg
 
 # Model checkpoints
 *.pth

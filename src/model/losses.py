@@ -151,7 +151,7 @@ class YoloDFLQFLoss(nn.Module):
         total_loss = self.lambda_box * mean_box + self.lambda_cls * mean_cls
 
         return total_loss, {
-            "total_loss": float(total_loss),
-            "box_loss": float(mean_box),
-            "cls_loss": float(mean_cls)
+            "total_loss": total_loss.detach().item(),
+            "box_loss": mean_box.detach().item(),
+            "cls_loss": mean_cls.detach().item()
         }

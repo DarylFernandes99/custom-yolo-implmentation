@@ -1,3 +1,4 @@
+import os
 import time
 import torch
 import wandb
@@ -100,12 +101,12 @@ def main():
         
         # Get data loaders
         train_loader, val_loader = get_data_loaders(
-            cfg['data']['train_parquet'],
-            cfg['data']['val_parquet'],
+            os.path.join(cfg['data']['processed_dir'], cfg['data']['train_parquet']),
+            os.path.join(cfg['data']['processed_dir'], cfg['data']['val_parquet']),
             cfg['data']['train_images'],
             cfg['data']['val_images'],
             training_cfg['batch_size'],
-            isTest=training_cfg['is_test']
+            is_test=training_cfg['is_test']
         )
         
         # Setup optimizer and scheduler
