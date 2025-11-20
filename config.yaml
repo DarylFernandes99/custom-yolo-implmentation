@@ -24,10 +24,10 @@ data:
   raw_dir: "dataset/raw"
   processed_dir: "dataset/processed/parquet"
   metadata_dir: "dataset/processed/metadata"
-  samples_dir: "dataset/samples"
+  annotations_dir: "dataset/raw/annotations"
 
-  train_parquet: "dataset/processed/parquet/annotations_train.parquet"
-  val_parquet: "dataset/processed/parquet/annotations_val.parquet"
+  train_parquet: "train"
+  val_parquet: "val"
 
   train_images: "dataset/raw/images/train"
   val_images: "dataset/raw/images/val"
@@ -58,7 +58,7 @@ model:
 training:
   is_test: true
   batch_size: 4
-  epochs: 3
+  epochs: 1
   learning_rate: 0.0001
   weight_decay: 0.0001
   optimizer: "adamw"
