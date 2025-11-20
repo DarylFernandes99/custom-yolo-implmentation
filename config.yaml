@@ -27,7 +27,7 @@ data:
   annotations_dir: "dataset/raw/annotations"
 
   train_parquet: "train"
-  val_parquet: "val"
+  val_parquet: "train"
 
   train_images: "dataset/raw/images/train"
   val_images: "dataset/raw/images/val"
