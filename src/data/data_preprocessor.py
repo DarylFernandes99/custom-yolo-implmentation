@@ -5,7 +5,9 @@ import dask
 import ijson
 import pandas as pd
 import pyarrow as pa
+from tqdm import tqdm
 import dask.dataframe as ddf
+from dask.diagnostics import ProgressBar
 from pycocotools import mask as maskUtils
 from typing import List, Optional, Dict, Union, Any
 
@@ -76,10 +78,16 @@ class DataPreprocess:
         chunks = []
 
         for file in file_names:
+            print(f"[INFO] Counting items in {file} ...")
+            with open(os.path.join(self.input_dir, file), "rb") as f:
+                total = sum(1 for _ in ijson.items(f, f"{key}.item"))
+
             with open(os.path.join(self.input_dir, file), 'rb') as data:
                 # Stream items using ijson
                 objects = ijson.items(data, f'{key}.item', use_float=True)
                 current_chunk = []
+
+                pbar = tqdm(total=total, desc=f"Loading {key}")
                 
                 for idx, obj in enumerate(objects):
                     current_chunk.append(obj)
@@ -87,9 +95,13 @@ class DataPreprocess:
                         chunks.append(pd.DataFrame(current_chunk, columns=columns))
                         current_chunk = []
                     
+                    pbar.update(1)
+
                     if self.is_test and (idx == 500):
                         print("[INFO] Early termination for test mode")
                         break
+                
+                pbar.close()
                 
                 if current_chunk:
                     chunks.append(pd.DataFrame(current_chunk, columns=columns))
@@ -304,7 +316,7 @@ class DataPreprocess:
             'name': list,
         }
         ddf_combined = ddf_combined.groupby(by=["file_name", "height", "width", "id"]).agg(agg_func, split_out=ddf_combined.npartitions).reset_index()
-        print("[INFO] Grouped multiple rows for each image")
+        print("[INFO] Grouped rows by image")
 
         # PyArrow schema to export data to parquet file
         pyarrow_schema = pa.schema([
@@ -321,7 +333,12 @@ class DataPreprocess:
             ("old_category_id", pa.list_(pa.int64())),
             ("name", pa.list_(pa.string())),
         ])
+        
         path = os.path.join(output_dir, output_folder)
         os.makedirs(path, exist_ok=True)
-        ddf.to_parquet(df=ddf_combined, path=path, write_index=False, schema=pyarrow_schema, compression="snappy", engine="pyarrow", name_function=lambda x: f"{output_folder}-{x}.parquet")
+        
+        print("[INFO] Exporting data...")
+        with ProgressBar():
+            ddf.to_parquet(df=ddf_combined, path=path, write_index=False, schema=pyarrow_schema, compression="snappy", engine="pyarrow", name_function=lambda x: f"{output_folder}-{x}.parquet")
+        
         print("[INFO] Exported data to {}".format(path))
