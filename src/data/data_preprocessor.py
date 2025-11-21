@@ -10,7 +10,7 @@ from pycocotools import mask as maskUtils
 from typing import List, Optional, Dict, Union, Any
 
 class DataPreprocess:
-    def __init__(self, annotations_dir: str, output_dir: str):
+    def __init__(self, annotations_dir: str, output_dir: str, is_test: bool = False):
         """
         Preprocessor for dataset annotation files used in image segmentation tasks.
         This class centralizes configuration for preprocessing annotation data (for example,
@@ -30,10 +30,15 @@ class DataPreprocess:
             Path to the directory where preprocessed annotation files and any derived outputs
             will be written. If the directory does not exist, calling code or specific methods
             may create it prior to writing.
+        is_test : bool, optional
+            Flag indicating whether the preprocessor is operating in test mode. When True,
+            enables reduced processing scope. Defaults to False for standard preprocessing
+            operations.
         """
 
         self.input_dir = annotations_dir
         self.output_dir = output_dir
+        self.is_test = is_test
 
     def load_annotations_file(self, file_names: List[str], key: str, columns: Optional[List[str]] = None, chunk_size=10_000) -> ddf.DataFrame:
         """
@@ -76,11 +81,15 @@ class DataPreprocess:
                 objects = ijson.items(data, f'{key}.item', use_float=True)
                 current_chunk = []
                 
-                for obj in objects:
+                for idx, obj in enumerate(objects):
                     current_chunk.append(obj)
                     if len(current_chunk) >= chunk_size:
                         chunks.append(pd.DataFrame(current_chunk, columns=columns))
                         current_chunk = []
+                    
+                    if self.is_test and (idx == 500):
+                        print("[INFO] Early termination for test mode")
+                        break
                 
                 if current_chunk:
                     chunks.append(pd.DataFrame(current_chunk, columns=columns))
@@ -213,7 +222,7 @@ class DataPreprocess:
         return pdf.apply(self._polygonFromMask_row, axis=1)
     
     @staticmethod
-    def create_parquet_data(annotations_dir: str, output_dir: str, output_folder: str, file_names: List[str], keys: List[str], columns: List[List[str]], chunk_sizes: List[int]):
+    def create_parquet_data(annotations_dir: str, output_dir: str, output_folder: str, file_names: List[str], keys: List[str], columns: List[List[str]], chunk_sizes: List[int], is_test: bool):
         """
         Creates a parquet file from image, annotations and categories.
         This function loads image data, annotations, and categories from specified files,
@@ -235,6 +244,8 @@ class DataPreprocess:
             A list of lists, where each inner list contains the column names to be loaded for each key.
         chunk_sizes : List[int]
             A list of chunk sizes for loading data in manageable pieces.
+        is_test : bool
+            Flag indicating whether the data preprocessor is working on test mode or not.
         
         Returns:
         -------
@@ -243,7 +254,8 @@ class DataPreprocess:
 
         data_preprocess = DataPreprocess(
             annotations_dir=annotations_dir,
-            output_dir=output_dir
+            output_dir=output_dir,
+            is_test=is_test
         )
         print("[INFO] Initialized data preprocessor object")
 
