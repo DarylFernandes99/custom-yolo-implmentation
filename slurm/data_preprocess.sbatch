@@ -16,7 +16,7 @@ ARG_VALUE="$1"
 mkdir -p "./slurm/logs/${SLURM_JOB_NAME}.${SLURM_JOB_ID}"
 
 # Load necessary modules (Anaconda)
-module anaconda3/2024.06
+module load anaconda3/2024.06
 
 # activate conda enironment
 source activate hpc_project
