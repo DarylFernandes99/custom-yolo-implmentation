@@ -15,6 +15,15 @@ conda env create -f environment.yml
 conda activate hpc_project
 ```
 
+## Run SLURM script
+```bash
+# For data preprocessing
+sbatch slurm/data_preprocess.sbatch <mode [train or val]>
+
+# For FSDP Training
+sbatch --export=WANDB_API_KEY="<enter_wandb_api_key>" slurm/fsdp_training.sbatch <arg_value [number of gpus]>
+```
+
 References:
 https://www.analyticsvidhya.com/blog/2025/01/yolov11-model-building/
 https://github.com/ultralytics/ultralytics/
