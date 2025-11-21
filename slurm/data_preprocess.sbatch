@@ -10,6 +10,8 @@
 #SBATCH --error=./slurm/logs/%x.%j/error.err
 #SBATCH --partition=courses
 
+ARG_VALUE="$1"
+
 # Create directory for logs (Slurm provides these variables)
 mkdir -p "./slurm/logs/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
 
