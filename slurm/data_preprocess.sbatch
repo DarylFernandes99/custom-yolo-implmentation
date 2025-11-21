@@ -16,7 +16,7 @@ ARG_VALUE="$1"
 module anaconda3/2024.06
 
 # activate conda enironment
-source activate hpc_lecture
+source activate hpc_project
 
 # Execute model training script
 python scripts/data_preprocess.py --mdoe $ARG_VALUE

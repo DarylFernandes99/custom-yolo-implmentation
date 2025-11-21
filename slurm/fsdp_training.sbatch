@@ -16,7 +16,7 @@ ARG_VALUE="$1"
 module load cuda/12.3.0 anaconda3/2024.06
 
 # activate conda enironment
-source activate hpc_lecture
+source activate hpc_project
 
 # Execute model training script
 torchrun --nproc_per_node=$ARG_VALUE scripts/fsdp_training.py
