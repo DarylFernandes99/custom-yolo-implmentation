@@ -1,19 +1,17 @@
 #!/bin/bash
-
-ARG_VALUE="$1"
-
-SLURM_PATH="./slurm/logs/$x.$j"
-mkdir -p $SLURM_PATH
-
-#SBATCH --job-name="Pre-process $ARG_VALUE Annotations Data"
+#
+#SBATCH --job-name="Pre-process Annotations Data"
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=16
 #SBATCH --ntasks=1
 #SBATCH --mem=32GB
 #SBATCH --time=01:00:00
-#SBATCH --output=$SLURM_PATH/output.out
-#SBATCH --error=$SLURM_PATH/error.err
+#SBATCH --output=./slurm/logs/%x.%j/output.out
+#SBATCH --error=./slurm/logs/%x.%j/error.err
 #SBATCH --partition=courses
+
+# Create directory for logs (Slurm provides these variables)
+mkdir -p "./slurm/logs/${SLURM_JOB_NAME}_${SLURM_JOB_ID}"
 
 # Load necessary modules (Anaconda)
 module anaconda3/2024.06
