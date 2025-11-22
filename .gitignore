@@ -220,3 +220,6 @@ dataset/
 
 # WandDB
 wandb/
+
+# Slurm logs
+slurm/logs/
