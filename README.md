@@ -21,7 +21,7 @@ conda activate hpc_project
 sbatch slurm/data_preprocess.sbatch <mode [train or val]>
 
 # For FSDP Training
-sbatch --export=WANDB_API_KEY="<enter_wandb_api_key>" slurm/fsdp_training.sbatch <arg_value [number of gpus]>
+sbatch --export=WANDB_API_KEY="<enter_wandb_api_key>" slurm/fsdp_training.sbatch
 ```
 
 References:

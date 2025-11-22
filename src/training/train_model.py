@@ -1,5 +1,7 @@
+import os
 import torch
 from tqdm import tqdm
+from datetime import datetime
 
 from src.training.metrics import DetectionMetrics
 from src.training.utils_train import save_checkpoint
@@ -96,6 +98,8 @@ def train(
         iou_threshold: IoU threshold for detection metrics
         conf_threshold: Confidence threshold for predictions
     """
+    
+    checkpoint_dir = os.path.join(checkpoint_dir, datetime.now().strftime('%d-%m-%Y--%H-%M-%S'))
     
     # Initialize metrics tracker
     detection_metrics = DetectionMetrics(
