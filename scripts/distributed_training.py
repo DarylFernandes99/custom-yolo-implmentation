@@ -7,7 +7,9 @@ import torch
 import wandb
 import argparse
 import functools
+from datetime import datetime
 
+from torchinfo import summary
 from src.model.model_builder import Model
 from src.model.losses import YoloDFLQFLoss
 from src.training.train_model import train
@@ -90,11 +92,13 @@ def main():
             lambda_cls=training_cfg['weights'].get('cls_loss', 1.0)
         )
         
-        from torchinfo import summary
+        postfix = datetime.now().strftime('%d-%m-%Y--%H-%M-%S')
+        checkpoint_dir = os.path.join(training_cfg.get('checkpoint_dir', 'experiments/checkpoints'), postfix)
+        
         model_summary_string = str(summary(model, input_size=(1, 3, 640, 640), verbose=0))
         if wandb_run is not None:
             summary_table = wandb.Table(columns=["PyTorch Model Summary"], data=[[model_summary_string]])
-            artifact = wandb.Artifact("model-architecture", type="model_summary",
+            artifact = wandb.Artifact(f"model-architecture-{postfix}", type="model_summary",
                           description="Summary of the PyTorch model architecture using torchinfo.")
             artifact.add(summary_table, "model_summary_table")
             wandb_run.log_artifact(artifact)
@@ -114,7 +118,7 @@ def main():
             use_wandb=use_wandb,
             wandb_instance=wandb_run,
             log_interval=training_cfg.get('log_interval', 10),
-            checkpoint_dir=training_cfg.get('checkpoint_dir', 'experiments/checkpoints'),
+            checkpoint_dir=checkpoint_dir,
             iou_threshold=training_cfg.get('iou_threshold', 0.5),
             conf_threshold=training_cfg.get('conf_threshold', 0.25)
         )
