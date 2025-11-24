@@ -10,6 +10,8 @@
 #SBATCH --error=./slurm/logs/%x.%j/error.err
 #SBATCH --partition=courses-gpu
 
+ARG_VALUE="$1"
+
 # Create directory for logs (Slurm provides these variables)
 mkdir -p "./slurm/logs/${SLURM_JOB_NAME}.${SLURM_JOB_ID}"
 
@@ -20,7 +22,7 @@ module load cuda/12.3.0 anaconda3/2024.06
 source activate hpc_project
 
 # Execute model training script
-torchrun --nproc_per_node=$SLURM_GPUS_ON_NODE scripts/fsdp_training.py
+torchrun --nproc_per_node=$SLURM_GPUS_ON_NODE scripts/distributed_training.py --mode $ARG_VALUE
 
 # Deactivate the environment
 conda deactivate

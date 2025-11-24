@@ -19,6 +19,38 @@ def init_distributed_mode():
     print("[INFO] Distirbuted process group initialized")
     return rank, world_size, gpu
 
+def reduce_value(value, average=True):
+    """
+    Reduces the value across all processes.
+    
+    Args:
+        value (float or torch.Tensor): Value to reduce
+        average (bool): If True, returns the average. If False, returns the sum.
+    
+    Returns:
+        float: Reduced value
+    """
+    if not dist.is_initialized():
+        return value
+        
+    world_size = dist.get_world_size()
+    if world_size < 2:
+        return value
+
+    with torch.no_grad():
+        # Convert float to tensor if needed
+        if not isinstance(value, torch.Tensor):
+            value = torch.tensor(value).cuda()
+        elif not value.is_cuda:
+            value = value.cuda()
+            
+        dist.all_reduce(value)
+        
+        if average:
+            value /= world_size
+            
+    return value.item()
+
 def cleanup_distribute_mode():
     if dist.is_initialized():
         dist.destroy_process_group()

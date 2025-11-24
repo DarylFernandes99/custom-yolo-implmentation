@@ -5,7 +5,7 @@ from datetime import datetime
 
 from src.training.metrics import DetectionMetrics
 from src.training.utils_train import save_checkpoint
-
+from src.training.distributed_setup import reduce_value
 
 def decode_predictions(preds, conf_threshold=0.25, top_k=100):
     """
@@ -109,6 +109,9 @@ def train(
     
     for epoch in range(num_epochs):
         # ============ TRAINING ============
+        if hasattr(train_loader.sampler, "set_epoch"):
+            train_loader.sampler.set_epoch(epoch)
+        
         model.train()
         total_train_loss = 0.0
         total_box_loss = 0.0
@@ -159,6 +162,12 @@ def train(
         avg_train_loss = total_train_loss / len(train_loader)
         avg_train_box = total_box_loss / len(train_loader)
         avg_train_cls = total_cls_loss / len(train_loader)
+
+        # Synchronize training losses across all processes
+        if rank != -1:
+             avg_train_loss = reduce_value(avg_train_loss, average=True)
+             avg_train_box = reduce_value(avg_train_box, average=True)
+             avg_train_cls = reduce_value(avg_train_cls, average=True)
         
         # ============ VALIDATION ============
         model.eval()
@@ -211,6 +220,11 @@ def train(
         avg_val_loss = total_val_loss / len(val_loader)
         avg_val_box = total_val_box / len(val_loader)
         avg_val_cls = total_val_cls / len(val_loader)
+
+        # Synchronize validation losses across all processes
+        avg_val_loss = reduce_value(avg_val_loss, average=True)
+        avg_val_box = reduce_value(avg_val_box, average=True)
+        avg_val_cls = reduce_value(avg_val_cls, average=True)
         
         # Compute detection metrics
         metrics_dict = detection_metrics.compute()
@@ -239,7 +253,7 @@ def train(
             save_checkpoint(model, optimizer, epoch, avg_val_loss, checkpoint_dir=checkpoint_dir)
             
             # Display epoch summary using tqdm.write (doesn't interrupt progress bars)
-            tqdm.write(f"\n{'='*80}")
+            tqdm.write(f"{'='*80}")
             tqdm.write(f"Epoch {epoch+1}/{num_epochs} Summary:")
             tqdm.write(f"  Train - Total: {avg_train_loss:.4f} | Box: {avg_train_box:.4f} | Cls: {avg_train_cls:.4f}")
             tqdm.write(f"  Val   - Total: {avg_val_loss:.4f} | Box: {avg_val_box:.4f} | Cls: {avg_val_cls:.4f}")

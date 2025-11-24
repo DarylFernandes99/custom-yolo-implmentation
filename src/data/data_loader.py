@@ -34,7 +34,7 @@ def get_data_loaders(train_parquet, val_parquet, train_images, val_images, batch
         drop_last=True
     )
 
-    print("\n[INFO] Creating Val Loader...", flush=True)
+    print("[INFO] Creating Val Loader...", flush=True)
     val_loader = DataLoader(
         val_dataset,
         batch_size=batch_size,

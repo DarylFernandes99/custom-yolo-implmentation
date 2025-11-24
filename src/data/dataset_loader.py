@@ -11,24 +11,6 @@ from torchvision import tv_tensors
 from torch.utils.data import Dataset
 from torchvision.transforms.v2 import functional as F
 
-from src.utils.common import get_num_workers
-
-def _safe_eval(x):
-    """Safely convert stringified list/dict to Python object."""
-    if isinstance(x, str):
-        try:
-            return ast.literal_eval(x)
-        except (ValueError, SyntaxError):
-            return x  # return original if malformed
-    return x
-
-
-def _parallel_apply_column(series, workers):
-    """Parallelize ast.literal_eval across a Pandas Series."""
-    with multiprocessing.Pool(processes=workers) as pool:
-        result = pool.map(_safe_eval, series)
-    return result
-
 class DetectionDataset(Dataset):
     """
     Custom Dataset for multi-class object detection.
@@ -46,11 +28,10 @@ class DetectionDataset(Dataset):
         self.df = pd.read_parquet(parquet_path)
         print("[INFO] Loaded parquet file - {}".format(parquet_path))
         if is_test:
-            self.df = self.df.head(100)
+            self.df = self.df.head(10)
             print("[INFO] Reducing data for test")
         self.image_dir = image_dir
         self.transform = transform
-        self.num_workers = get_num_workers()
 
     def __len__(self):
         return len(self.df)

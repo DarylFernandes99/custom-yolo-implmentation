@@ -72,29 +72,21 @@ training:
 
   # FSDP / Distributed
   fsdp:
-    use_fsdp: true
     sharding_strategy: "FULL_SHARD"
     auto_wrap_policy_min_params: 10000000
     precision: "float32"   # One of ("bfloat16", "float16", "float32")
+  
+  fsdp2:
+    precision: "float32"   # One of ("bfloat16", "float16", "float32")
+
+  ddp:
+    find_unused_parameters: false
 
   # Training weights
   weights:
     cls_loss: 1.0
-    bbox_loss: 1.0
+    bbox_loss: 1.5
     mask_loss: 0.5   # optional (if segmentation enabled)
-
-# ============================================================
-#  METRICS CONFIGURATION
-# ============================================================
-
-metrics:
-  - precision
-  - recall
-  - f1_score
-  - mAP
-  - loss_curve
-  - learning_rate
-  - gpu_memory_usage
 
 # ============================================================
 #  WANDB CONFIGURATION
@@ -104,7 +96,7 @@ wandb:
   enable: true
   project_name: "hpc_project"
   entity: "daryl99"         # <-- replace with your wandb username/team
-  run_name: "fsdp_training_run"
+  run_name: "training_run"
   log_frequency: 1                     # log every N steps
   mode: "online"                        # "online" | "offline" | "disabled"
 
