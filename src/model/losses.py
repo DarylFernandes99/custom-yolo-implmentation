@@ -101,7 +101,7 @@ class YoloDFLQFLoss(nn.Module):
                 continue
 
             M = gt_boxes.size(0)
-            gt_xywh = gt_boxes[:, 0:4]
+            gt_xywh = gt_boxes[:, 0:4].to(preds.dtype)
 
             # ---------------------------------------------------
             # VECTORIZED MATCHING (NO LOOPS)
@@ -131,7 +131,7 @@ class YoloDFLQFLoss(nn.Module):
             target_scores = torch.zeros_like(matched_pred_scores)    # (M, C)
             class_ids = gt_boxes[:, 4].long().unsqueeze(1)           # (M, 1)
 
-            target_scores.scatter_(1, class_ids, iou)                # fill IoU at GT class
+            target_scores.scatter_(1, class_ids, iou.to(target_scores.dtype))                # fill IoU at GT class
 
             cls_loss = quality_focal_loss(matched_pred_scores, target_scores)
 

@@ -1,7 +1,7 @@
 import os
 import torch
 from tqdm import tqdm
-from torch.cuda.amp import GradScaler
+from torch.amp import GradScaler
 try:
     from torch.distributed.fsdp.sharded_grad_scaler import ShardedGradScaler
 except ImportError:
@@ -54,7 +54,7 @@ def decode_predictions(preds, conf_threshold=0.25, top_k=100):
         
         # Combine to (M, 5) format
         predictions = torch.cat([
-            filtered_boxes,
+            filtered_boxes.float(),
             filtered_classes.unsqueeze(1).float()
         ], dim=1)
         
@@ -118,11 +118,11 @@ def train(
                 if rank == 0:
                     print("[INFO] Initialized ShardedGradScaler for FSDP float16 training")
             else:
-                scaler = GradScaler()
+                scaler = GradScaler(device)
                 if rank == 0:
                     print("[INFO] ShardedGradScaler not found, falling back to GradScaler for float16")
         else:
-            scaler = GradScaler()
+            scaler = GradScaler(device)
             if rank == 0:
                 print("[INFO] Initialized GradScaler for DDP float16 training")
     elif use_amp and precision == "bfloat16" and rank == 0:

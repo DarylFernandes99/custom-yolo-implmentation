@@ -11,7 +11,7 @@
 #SBATCH --partition=courses-gpu
 
 ARG_VALUE="$1"
-PRECISION=${1:-"float32"}
+PRECISION=${2:-"float32"}
 
 # Create directory for logs (Slurm provides these variables)
 mkdir -p "./slurm/logs/${SLURM_JOB_NAME}.${SLURM_JOB_ID}"
