@@ -39,6 +39,9 @@ def main():
     model_cfg = cfg["model"]
     checkpoint_cfg = cfg["checkpoint"]
     
+    postfix = datetime.now().strftime('%d-%m-%Y--%H-%M-%S')
+    checkpoint_dir = os.path.join(checkpoint_cfg.get('checkpoint_dir', 'experiments/checkpoints'), postfix)
+    
     # Initialize distributed training
     rank, world_size, gpu = init_distributed_mode()
     
@@ -59,6 +62,7 @@ def main():
             config = {
                 "gpu": world_size,
                 "mode": args.mode,
+                "checkpoint_path": checkpoint_dir,
                 **training_cfg
             }
             wandb_run = setup_wandb(config, wandb_config, args.mode)
@@ -103,9 +107,6 @@ def main():
             lambda_box=training_cfg['weights'].get('bbox_loss', 1.5),
             lambda_cls=training_cfg['weights'].get('cls_loss', 1.0)
         )
-        
-        postfix = datetime.now().strftime('%d-%m-%Y--%H-%M-%S')
-        checkpoint_dir = os.path.join(checkpoint_cfg.get('checkpoint_dir', 'experiments/checkpoints'), postfix)
         
         model_summary_string = str(summary(model, input_size=(1, 3, 640, 640), verbose=0))
         if wandb_run is not None:

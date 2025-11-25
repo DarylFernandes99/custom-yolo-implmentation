@@ -16,7 +16,7 @@ def init_distributed_mode():
         backend="nccl", init_method="env://", world_size=world_size, rank=rank
     )
     dist.barrier(device_ids=[int(rank)])
-    print("[INFO] Distirbuted process group initialized")
+    print("[INFO] Distributed process group initialized")
     return rank, world_size, gpu
 
 def reduce_value(value, average=True):

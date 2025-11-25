@@ -130,7 +130,11 @@ def prepare_fsdp2_model(model: nn.Module, device_id: int, config: Dict[str, Unio
     mp_policy = None
     if config.get('precision') in ("bfloat16", "float16", "float32"):
         dtype = getattr(torch, config['precision'])
-        mp_policy = MixedPrecisionPolicy(param_dtype=dtype, reduce_dtype=dtype)
+        mp_policy = MixedPrecisionPolicy(param_dtype=dtype, reduce_dtype=dtype, cast_forward_inputs=True)
+        
+        # Align buffer precision with parameters to prevent type mismatch errors (e.g. in BatchNorm)
+        for buffer in model.buffers():
+            buffer.data = buffer.data.to(dtype=dtype)
 
     for module in reversed(list(model.modules())):
         if isinstance(module, (Conv, nn.MaxPool2d)):
