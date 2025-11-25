@@ -14,7 +14,7 @@ def setup_wandb(config: Dict[str, Union[str, int, float]], wandb_config: Dict[st
     wandb_run = wandb.init(
         entity=wandb_config['entity'],
         project=wandb_config['project_name'],
-        name=f"{mode}_{wandb_config['run_name']}_{datetime.now().strftime('%d-%m-%Y--%H:%M:%S')}",
+        name=f"{mode}_{config[mode]['precision']}_{wandb_config['run_name']}_{datetime.now().strftime('%d-%m-%Y--%H:%M:%S')}",
         config=config
     )
     print("[INFO] WanDB Initialzed")
