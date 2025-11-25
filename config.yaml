@@ -11,9 +11,8 @@ project:
   distributed: true
   mixed_precision: true
   output_dir: "experiments"
-  log_dir: "./experiments/run_logs"
-  checkpoint_dir: "./experiments/checkpoints"
-  profile_dir: "./experiments/profiles"
+  log_dir: "./dataset/experiments/run_logs"
+  profile_dir: "./dataset/experiments/profiles"
 
 # ============================================================
 #  DATA CONFIGURATION
@@ -74,13 +73,14 @@ training:
   fsdp:
     sharding_strategy: "FULL_SHARD"
     auto_wrap_policy_min_params: 10000000
-    precision: "float32"   # One of ("bfloat16", "float16", "float32")
+    precision: "bfloat16"   # One of ("bfloat16", "float16", "float32")
   
   fsdp2:
-    precision: "float32"   # One of ("bfloat16", "float16", "float32")
+    precision: "bfloat16"   # One of ("bfloat16", "float16", "float32")
 
   ddp:
     find_unused_parameters: false
+    precision: "float32"    # One of ("bfloat16", "float16", "float32")
 
   # Training weights
   weights:
@@ -109,7 +109,7 @@ checkpoint:
   resume_training: false
   best_model_metric: "val/loss"
   best_model_mode: "min"
-  checkpoint_dir: "./experiments/checkpoints"
+  checkpoint_dir: "./dataset/experiments/checkpoints"
 
 logging:
   console_log: true

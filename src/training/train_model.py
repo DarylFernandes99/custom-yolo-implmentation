@@ -1,6 +1,11 @@
 import os
 import torch
 from tqdm import tqdm
+from torch.cuda.amp import GradScaler
+try:
+    from torch.distributed.fsdp.sharded_grad_scaler import ShardedGradScaler
+except ImportError:
+    ShardedGradScaler = None
 
 from src.training.metrics import DetectionMetrics
 from src.training.utils_train import save_checkpoint
@@ -74,7 +79,9 @@ def train(
     log_interval=10,
     checkpoint_dir="experiments/checkpoints",
     iou_threshold=0.5,
-    conf_threshold=0.25
+    conf_threshold=0.25,
+    distributed_mode="ddp",
+    precision="float32"
 ):
     """
     Training loop for object detection model.
@@ -96,8 +103,31 @@ def train(
         checkpoint_dir: Directory to save model checkpoints
         iou_threshold: IoU threshold for detection metrics
         conf_threshold: Confidence threshold for predictions
+        distributed_mode: Mode of distributed training ("ddp", "fsdp", "fsdp2")
+        precision: Precision mode ("float32", "float16", "bfloat16")
     """
     
+    # Initialize mixed precision components
+    use_amp = precision in ["float16", "bfloat16"]
+    scaler = None
+    
+    if use_amp and precision == "float16":
+        if distributed_mode.startswith("fsdp"):
+            if ShardedGradScaler is not None:
+                scaler = ShardedGradScaler()
+                if rank == 0:
+                    print("[INFO] Initialized ShardedGradScaler for FSDP float16 training")
+            else:
+                scaler = GradScaler()
+                if rank == 0:
+                    print("[INFO] ShardedGradScaler not found, falling back to GradScaler for float16")
+        else:
+            scaler = GradScaler()
+            if rank == 0:
+                print("[INFO] Initialized GradScaler for DDP float16 training")
+    elif use_amp and precision == "bfloat16" and rank == 0:
+        print("[INFO] Using bfloat16 precision (no scaler needed)")
+
     # Initialize metrics tracker
     detection_metrics = DetectionMetrics(
         num_classes=num_classes,
@@ -124,12 +154,22 @@ def train(
             images = images.to(device)
             gt_box = [target["boxes"].to(device) for target in targets]
             
-            preds = model(images)
-            loss, loss_dict = criterion(preds, gt_box)
-            
             optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            
+            enable_autocast = (distributed_mode == "ddp" and use_amp)
+            amp_dtype = torch.bfloat16 if precision == "bfloat16" else torch.float16
+            
+            with torch.autocast(device_type="cuda", dtype=amp_dtype, enabled=enable_autocast):
+                preds = model(images)
+                loss, loss_dict = criterion(preds, gt_box)
+            
+            if scaler is not None:
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                loss.backward()
+                optimizer.step()
             
             # Accumulate losses
             total_train_loss += loss_dict['total_loss']
@@ -186,9 +226,12 @@ def train(
                 images = images.to(device)
                 gt_box = [target["boxes"].to(device) for target in targets]
                 
-                # Use the same criterion for validation
-                preds = model(images)
-                loss, loss_dict = criterion(preds, gt_box)
+                enable_autocast = (distributed_mode == "ddp" and use_amp)
+                amp_dtype = torch.bfloat16 if precision == "bfloat16" else torch.float16
+
+                with torch.autocast(device_type="cuda", dtype=amp_dtype, enabled=enable_autocast):
+                    preds = model(images)
+                    loss, loss_dict = criterion(preds, gt_box)
                 
                 # Accumulate validation losses
                 total_val_loss += loss_dict['total_loss']
