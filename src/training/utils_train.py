@@ -71,7 +71,6 @@ def prepare_fsdp_model(model: nn.Module, device_id: int, config: Dict[str, Union
         nn.Module: The FSDP-wrapped model.
     """
     torch.cuda.set_device(device_id)
-    model = model.to(device_id)
     
     mixed_precision = None
     if config['precision'] in ("bfloat16", "float16", "float32"):
@@ -97,7 +96,8 @@ def prepare_fsdp_model(model: nn.Module, device_id: int, config: Dict[str, Union
         auto_wrap_policy=auto_wrap_policy,
         sharding_strategy=sharding_strategy,
         mixed_precision=mixed_precision,
-        use_orig_params=True
+        use_orig_params=True,
+        device_id=device_id
     )
 
     return model

@@ -28,6 +28,9 @@ def main():
     parser.add_argument("--mode", type=str, required=True, metavar="M",
                         choices=["fsdp", "ddp", "fsdp2"],
                         help="mode to set which distributed training to use (fsdp - for FSDP, ddp - for DDP, fsdp2 - for FSDP2)")
+    parser.add_argument("--precision", type=str, default="float32", metavar="P",
+                        choices=["float32", "bfloat16", "float16"],
+                        help="precision to use for training (default: float32)")
     args = parser.parse_args()
 
     # Load configuration
@@ -43,6 +46,14 @@ def main():
     use_wandb = cfg.get("wandb", {}).get("enable", False)
     wandb_run = None
     try:
+        # Override config with CLI argument BEFORE model initialization
+        if args.mode == "fsdp":
+            training_cfg['fsdp']['precision'] = args.precision
+        elif args.mode == "fsdp2":
+             training_cfg['fsdp2']['precision'] = args.precision
+        elif args.mode == "ddp":
+             training_cfg['ddp']['precision'] = args.precision
+
         if rank == 0 and use_wandb:
             wandb_config = cfg["wandb"]
             config = {
@@ -121,7 +132,9 @@ def main():
             log_interval=training_cfg.get('log_interval', 10),
             checkpoint_dir=checkpoint_dir,
             iou_threshold=training_cfg.get('iou_threshold', 0.5),
-            conf_threshold=training_cfg.get('conf_threshold', 0.25)
+            conf_threshold=training_cfg.get('conf_threshold', 0.25),
+            distributed_mode=args.mode,
+            precision=args.precision
         )
     except Exception as e:
         print("[ERROR] {}".format(str(e)))

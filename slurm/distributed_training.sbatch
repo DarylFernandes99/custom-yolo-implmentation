@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#SBATCH --job-name="FSDP Training using GPUs"
+#SBATCH --job-name="Training using GPUs"
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node=v100-sxm2:1
 #SBATCH --cpus-per-task=4
@@ -11,6 +11,7 @@
 #SBATCH --partition=courses-gpu
 
 ARG_VALUE="$1"
+PRECISION=${1:-"float32"}
 
 # Create directory for logs (Slurm provides these variables)
 mkdir -p "./slurm/logs/${SLURM_JOB_NAME}.${SLURM_JOB_ID}"
@@ -58,7 +59,7 @@ AVAILABLE_PORT=$(find_free_port)
 #############################################################
 
 # Execute model training script
-torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:$AVAILABLE_PORT --nproc_per_node=$SLURM_GPUS_ON_NODE scripts/distributed_training.py --mode $ARG_VALUE
+torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:$AVAILABLE_PORT --nproc_per_node=$SLURM_GPUS_ON_NODE scripts/distributed_training.py --mode $ARG_VALUE --precision $PRECISION
 
 # Deactivate the environment
 conda deactivate
