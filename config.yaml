@@ -109,6 +109,7 @@ checkpoint:
   resume_training: false
   best_model_metric: "val/loss"
   best_model_mode: "min"
+  checkpoint_dir: "./experiments/checkpoints"
 
 logging:
   console_log: true

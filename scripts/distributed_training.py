@@ -34,6 +34,7 @@ def main():
     cfg = load_config()
     training_cfg = cfg["training"]
     model_cfg = cfg["model"]
+    checkpoint_cfg = cfg["checkpoint"]
     
     # Initialize distributed training
     rank, world_size, gpu = init_distributed_mode()
@@ -93,7 +94,7 @@ def main():
         )
         
         postfix = datetime.now().strftime('%d-%m-%Y--%H-%M-%S')
-        checkpoint_dir = os.path.join(training_cfg.get('checkpoint_dir', 'experiments/checkpoints'), postfix)
+        checkpoint_dir = os.path.join(checkpoint_cfg.get('checkpoint_dir', 'experiments/checkpoints'), postfix)
         
         model_summary_string = str(summary(model, input_size=(1, 3, 640, 640), verbose=0))
         if wandb_run is not None:
