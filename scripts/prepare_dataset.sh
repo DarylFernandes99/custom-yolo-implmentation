@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Root dataset path
-ROOT_PATH="./dataset1"
+ROOT_PATH="/scratch/$USER/dataset"
 
 # Raw annotations and images path
 RAW_PATH="$ROOT_PATH/raw"
@@ -69,7 +69,11 @@ for url in "${DOWNLOAD_URLS[@]}"; do
         if [ $? -eq 0 ]; then
             echo " - Downloaded $base_name successfully"
             echo " - Extracting $base_name..."
-            unzip -d "$RAW_IMAGES_PATH" "$RAW_IMAGES_PATH/$base_name"
+            if [[ "$url" == *"annotations"* ]]; then
+                unzip -d "$RAW_PATH" "$RAW_IMAGES_PATH/$base_name"
+            else
+                unzip -d "$RAW_IMAGES_PATH" "$RAW_IMAGES_PATH/$base_name"
+            fi
             echo " - Extracting $base_name completed"
         else
             echo " - Downloaded $base_name failed"
