@@ -31,10 +31,13 @@ def main():
     parser.add_argument("--precision", type=str, default="float32", metavar="P",
                         choices=["float32", "bfloat16", "float16"],
                         help="precision to use for training (default: float32)")
+    parser.add_argument("--batch_size", type=int, default=None, metavar="B",
+                        help="batch size to use for training (default: use config.yaml batch_size)")
     args = parser.parse_args()
 
     # Load configuration
     cfg = load_config()
+    data_cfg = cfg["data"]
     training_cfg = cfg["training"]
     model_cfg = cfg["model"]
     checkpoint_cfg = cfg["checkpoint"]
@@ -53,9 +56,12 @@ def main():
         if args.mode == "fsdp":
             training_cfg['fsdp']['precision'] = args.precision
         elif args.mode == "fsdp2":
-             training_cfg['fsdp2']['precision'] = args.precision
+            training_cfg['fsdp2']['precision'] = args.precision
         elif args.mode == "ddp":
-             training_cfg['ddp']['precision'] = args.precision
+            training_cfg['ddp']['precision'] = args.precision
+        
+        if args.batch_size is not None:
+            training_cfg['batch_size'] = args.batch_size
 
         if args.precision != "float32":
             training_cfg['batch_size'] = int(1.5 * training_cfg['batch_size'])
@@ -68,40 +74,41 @@ def main():
                 "checkpoint_path": checkpoint_dir,
                 **training_cfg
             }
-            wandb_run = setup_wandb(config, wandb_config, args.mode)
+            wandb_run = setup_wandb(config=config, wandb_config=wandb_config, mode=args.mode)
         
         # Create model
         model = Model(**model_cfg['config'], num_classes=model_cfg.get('num_classes', 172))
 
         if args.mode == "fsdp":
-            model = prepare_fsdp_model(model, gpu, training_cfg['fsdp'], world_size)
+            model = prepare_fsdp_model(model=model, device_id=gpu, config=training_cfg['fsdp'], world_size=world_size)
             print("[INFO] FSDP model initialzed")
         elif args.mode == "fsdp2":
-            model = prepare_fsdp2_model(model, gpu, training_cfg['fsdp2'], world_size)
+            model = prepare_fsdp2_model(model=model, device_id=gpu, config=training_cfg['fsdp2'], world_size=world_size)
             print("[INFO] FSDP2 model initialzed")
         elif args.mode == "ddp":
-            model = prepare_ddp_model(model, gpu, training_cfg['ddp'])
+            model = prepare_ddp_model(model=model, device_id=gpu, config=training_cfg['ddp'])
             print("[INFO] DDP model initialzed")
         else:
             raise ValueError(f"Invalid mode: {args.mode}")
         
         # Get data loaders
         train_loader, val_loader = get_data_loaders(
-            os.path.join(cfg['data']['processed_dir'], cfg['data']['train_parquet']),
-            os.path.join(cfg['data']['processed_dir'], cfg['data']['val_parquet']),
-            cfg['data']['train_images'],
-            cfg['data']['val_images'],
-            training_cfg['batch_size'],
-            is_test=training_cfg['is_test']
+            train_parquet=os.path.join(data_cfg['processed_dir'], data_cfg['train_parquet']),
+            val_parquet=os.path.join(data_cfg['processed_dir'], data_cfg['val_parquet']),
+            train_images=data_cfg['train_images'],
+            val_images=data_cfg['val_images'],
+            batch_size=training_cfg['batch_size'],
+            is_test=training_cfg['is_test'],
+            prefetch_factor=data_cfg.get('prefetch_factor', 2)
         )
         
         # Setup optimizer and scheduler
         optimizer, scheduler = get_optimizer(
-            model,
-            training_cfg['learning_rate'],
-            training_cfg['weight_decay'],
-            training_cfg['learning_rate_patience'],
-            training_cfg['learning_rate_factor']
+            model=model,
+            lr=training_cfg['learning_rate'],
+            weight_decay=training_cfg['weight_decay'],
+            patience=training_cfg['learning_rate_patience'],
+            factor=training_cfg['learning_rate_factor']
         )
         
         # Setup loss criterion
