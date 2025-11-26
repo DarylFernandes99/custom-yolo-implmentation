@@ -58,7 +58,7 @@ def main():
              training_cfg['ddp']['precision'] = args.precision
 
         if args.precision != "float32":
-            training_cfg['batch_size'] = 1.5 * training_cfg['batch_size']
+            training_cfg['batch_size'] = int(1.5 * training_cfg['batch_size'])
 
         if rank == 0 and use_wandb:
             wandb_config = cfg["wandb"]
