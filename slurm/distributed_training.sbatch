@@ -2,16 +2,17 @@
 #
 #SBATCH --job-name="Training using GPUs"
 #SBATCH --nodes=1
-#SBATCH --gpus-per-node=v100-sxm2:1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=16GB
-#SBATCH --time=24:00:00
+#SBATCH --gpus-per-node=h200:1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=64GB
+#SBATCH --time=08:00:00
 #SBATCH --output=./slurm/logs/%x.%j/output.out
 #SBATCH --error=./slurm/logs/%x.%j/error.err
-#SBATCH --partition=courses-gpu
+#SBATCH --partition=gpu
 
-ARG_VALUE="$1"
-PRECISION=${2:-"float32"}
+MODE=${1:-"None"}
+PRECISION=${2:-"None"}
+BATCH_SIZE=${3:-"None"}
 
 # Create directory for logs (Slurm provides these variables)
 mkdir -p "./slurm/logs/${SLURM_JOB_NAME}.${SLURM_JOB_ID}"
@@ -58,8 +59,18 @@ find_free_port() {
 AVAILABLE_PORT=$(find_free_port)
 #############################################################
 
-# Execute model training script
-torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:$AVAILABLE_PORT --nproc_per_node=$SLURM_GPUS_ON_NODE scripts/distributed_training.py --mode $ARG_VALUE --precision $PRECISION
+# Execute model training script with optional arguments
+CMD_ARGS=""
+if [ "$MODE" != "None" ]; then
+    CMD_ARGS="$CMD_ARGS --mode $MODE"
+fi
+if [ "$PRECISION" != "None" ]; then
+    CMD_ARGS="$CMD_ARGS --precision $PRECISION"
+fi
+if [ "$BATCH_SIZE" != "None" ]; then
+    CMD_ARGS="$CMD_ARGS --batch_size $BATCH_SIZE"
+fi
+torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:$AVAILABLE_PORT --nproc_per_node=$SLURM_GPUS_ON_NODE scripts/distributed_training.py $CMD_ARGS
 
 # Deactivate the environment
 conda deactivate

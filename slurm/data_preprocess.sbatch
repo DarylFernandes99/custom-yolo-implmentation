@@ -10,7 +10,7 @@
 #SBATCH --error=./slurm/logs/%x.%j/error.err
 #SBATCH --partition=courses
 
-ARG_VALUE="$1"
+MODE=${1:-"None"}
 
 # Create directory for logs (Slurm provides these variables)
 mkdir -p "./slurm/logs/${SLURM_JOB_NAME}.${SLURM_JOB_ID}"
@@ -22,7 +22,11 @@ module load anaconda3/2024.06
 source activate hpc_project
 
 # Execute model training script
-python scripts/data_preprocess.py --mode $ARG_VALUE
+CMD_ARGS=""
+if [ "$MODE" != "None" ]; then
+    CMD_ARGS="$CMD_ARGS --mode $MODE"
+fi
+python scripts/data_preprocess.py $CMD_ARGS
 
 # Deactivate the environment
 conda deactivate
