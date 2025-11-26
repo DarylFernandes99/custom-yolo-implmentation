@@ -84,7 +84,8 @@ class YoloDFLQFLoss(nn.Module):
         gt_boxes_list: list of length N, each → (Mi, 5)
         """
         N = preds.shape[0]
-        preds = preds.transpose(1, 2)  # (N, 8400, 175)
+        # Cast to float32 for numerical stability (prevents inf/nan in log/exp with float16)
+        preds = preds.float().transpose(1, 2)  # (N, 8400, 175)
 
         total_box = 0.0
         total_cls = 0.0
