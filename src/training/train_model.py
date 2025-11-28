@@ -11,55 +11,134 @@ from src.training.metrics import DetectionMetrics
 from src.training.utils_train import save_checkpoint
 from src.training.distributed_setup import reduce_value
 
-def decode_predictions(preds, conf_threshold=0.25, top_k=100):
+def decode_predictions(preds, anchors, strides, conf_threshold=0.25, top_k=100, num_classes=171):
     """
     Convert raw model predictions to format suitable for metrics computation.
     
     Args:
-        preds: (N, 175, 8400) - model outputs
+        preds: (N, 4*reg_max + nc, 8400) - raw model outputs
+        anchors: (2, 8400) - anchor points
+        strides: (1, 8400) - strides
         conf_threshold: minimum confidence threshold
         top_k: maximum number of predictions per image
     
     Returns:
         List of tensors, each (M, 5) containing [x, y, w, h, class_id]
     """
+    # preds is (N, C, M)
+    # Split box and cls
+    # We need to know reg_max. Assuming 16 based on previous context or we can deduce.
+    # The Head has self.ch=16. 4*16 = 64.
+    # We can pass this or hardcode for now.
+    reg_max = 16
+    box_channels = 4 * reg_max
+    
+    pred_dist = preds[:, :box_channels, :] # (N, 64, M)
+    pred_scores = preds[:, box_channels:, :] # (N, nc, M)
+    
     N = preds.shape[0]
-    preds = preds.transpose(1, 2)  # (N, 8400, 175)
+    M_anchors = preds.shape[2]
+    
+    # Decode boxes using DFL logic (Expectation)
+    # Reshape dist to (N, 4, 16, M) -> permute to (N, M, 4, 16)
+    pred_dist = pred_dist.view(N, 4, reg_max, M_anchors).permute(0, 3, 1, 2)
+    pred_dist = pred_dist.softmax(3)
+    
+    # Expectation
+    values = torch.arange(reg_max, device=preds.device, dtype=preds.dtype)
+    pred_box_raw = torch.sum(pred_dist * values, dim=3) # (N, M, 4) -> l,t,r,b
+    
+    # Convert l,t,r,b to xywh using anchors and strides
+    # anchors: (2, M) -> (1, M, 2)
+    # strides: (1, M) -> (1, M, 1)
+    anchors_t = anchors.transpose(0, 1).unsqueeze(0) # (1, M, 2)
+    strides_t = strides.transpose(0, 1).unsqueeze(0) # (1, M, 1)
+    
+    # pred_box_raw is (l, t, r, b) relative to anchor
+    # x1 = anchor_x - l * stride
+    # y1 = anchor_y - t * stride
+    # x2 = anchor_x + r * stride
+    # y2 = anchor_y + b * stride
+    
+    # Wait, the Head implementation of decoding was:
+    # a, b = self.dfl(box).chunk(2, 1)  (where box was 64 channels)
+    # a = anchors - a
+    # b = anchors + b
+    # box = ((a+b)/2, b-a) * stride
+    
+    # Here pred_box_raw corresponds to the output of self.dfl(box) (which is 4 channels)
+    # split into lt (2) and rb (2)?
+    # The DFL block in model_blocks.py:
+    # return self.conv(x.view(b, 4, self.c1, a).transpose(2, 1).softmax(1)).view(b, 4, a)
+    # It returns (N, 4, M).
+    # So pred_box_raw (N, M, 4) is correct (just transposed).
+    
+    # Let's follow Head logic:
+    # pred_box_raw is (N, M, 4). Let's transpose to (N, 4, M) to match Head logic if needed, 
+    # but we can work with (N, M, 4).
+    
+    lt = pred_box_raw[:, :, :2] # (N, M, 2)
+    rb = pred_box_raw[:, :, 2:] # (N, M, 2)
+    
+    # a = anchors - lt
+    # b = anchors + rb
+    # But wait, Head logic:
+    # a, b = dfl_out.chunk(2, 1) -> dfl_out is (N, 4, M)
+    # So a is (N, 2, M) (lt?), b is (N, 2, M) (rb?)
+    # a = anchors.unsqueeze(0) - a
+    # b = anchors.unsqueeze(0) + b
+    # box = torch.cat(((a+b)/2, b-a), dim=1)
+    # This means 'a' and 'b' became x1y1 and x2y2?
+    # No.
+    # If dfl_out is [l, t, r, b], then:
+    # a = [l, t], b = [r, b]
+    # new_a = anchor - [l, t] = [ax-l, ay-t] = [x1, y1]
+    # new_b = anchor + [r, b] = [ax+r, ay+b] = [x2, y2]
+    # center = (new_a + new_b) / 2 = [(x1+x2)/2, (y1+y2)/2] = [cx, cy]
+    # size = new_b - new_a = [x2-x1, y2-y1] = [w, h]
+    
+    # So yes, this logic converts ltrb to xywh (center format).
+    # And finally * strides.
+    
+    x1y1 = anchors_t - lt
+    x2y2 = anchors_t + rb
+    
+    xy = (x1y1 + x2y2) / 2
+    wh = x2y2 - x1y1
+    
+    pred_box = torch.cat([xy, wh], dim=2) * strides_t # (N, M, 4)
     
     batch_predictions = []
     
     for b in range(N):
-        pred = preds[b]  # (8400, 175)
-        pred_box = pred[:, :4]  # (8400, 4) - xywh
-        pred_scores = pred[:, 4:]  # (8400, C) - class scores
+        # Per image
+        boxes = pred_box[b] # (M, 4)
+        scores = pred_scores[b].transpose(0, 1).sigmoid() # (M, nc)
         
-        # Get max class score and class index for each anchor
-        max_scores, class_ids = pred_scores.sigmoid().max(dim=1)  # (8400,), (8400,)
-        
-        # Filter by confidence threshold
+        # Filter by confidence
+        max_scores, class_ids = scores.max(dim=1)
         mask = max_scores >= conf_threshold
-        filtered_boxes = pred_box[mask]  # (M, 4)
-        filtered_scores = max_scores[mask]  # (M,)
-        filtered_classes = class_ids[mask]  # (M,)
+        
+        filtered_boxes = boxes[mask]
+        filtered_scores = max_scores[mask]
+        filtered_classes = class_ids[mask]
         
         if filtered_boxes.numel() == 0:
             batch_predictions.append(torch.zeros(0, 5, device=preds.device))
             continue
-        
-        # Sort by score and keep top_k
+            
         if filtered_scores.numel() > top_k:
             top_indices = torch.topk(filtered_scores, top_k)[1]
             filtered_boxes = filtered_boxes[top_indices]
             filtered_classes = filtered_classes[top_indices]
-        
-        # Combine to (M, 5) format
+            
         predictions = torch.cat([
-            filtered_boxes.float(),
+            filtered_boxes,
             filtered_classes.unsqueeze(1).float()
         ], dim=1)
         
         batch_predictions.append(predictions)
-    
+        
     return batch_predictions
 
 
@@ -160,8 +239,8 @@ def train(
             amp_dtype = torch.bfloat16 if precision == "bfloat16" else torch.float16
             
             with torch.autocast(device_type="cuda", dtype=amp_dtype, enabled=enable_autocast):
-                preds = model(images)
-                loss, loss_dict = criterion(preds, gt_box)
+                preds, anchors, strides = model(images)
+                loss, loss_dict = criterion(preds, gt_box, anchors, strides)
             
             if scaler is not None:
                 scaler.scale(loss).backward()
@@ -230,8 +309,8 @@ def train(
                 amp_dtype = torch.bfloat16 if precision == "bfloat16" else torch.float16
 
                 with torch.autocast(device_type="cuda", dtype=amp_dtype, enabled=enable_autocast):
-                    preds = model(images)
-                    loss, loss_dict = criterion(preds, gt_box)
+                    preds, anchors, strides = model(images)
+                    loss, loss_dict = criterion(preds, gt_box, anchors, strides)
                 
                 # Accumulate validation losses
                 total_val_loss += loss_dict['total_loss']
@@ -239,7 +318,7 @@ def train(
                 total_val_cls += loss_dict['cls_loss']
                 
                 # Compute detection metrics
-                decoded_preds = decode_predictions(preds, conf_threshold=conf_threshold)
+                decoded_preds = decode_predictions(preds, anchors, strides, conf_threshold=conf_threshold, num_classes=num_classes)
                 
                 # Update metrics for each image in batch
                 for i in range(len(decoded_preds)):
