@@ -20,20 +20,13 @@ from src.training.utils_train import get_optimizer
 from src.training.distributed_setup import init_distributed_mode, cleanup_distribute_mode
 from src.training.utils_train import prepare_fsdp_model, prepare_ddp_model, prepare_fsdp2_model
 
-def main():
+def main(args):
     """
     Main training entry point with distributed setup.
+
+    Args:
+        args: Command-line arguments.
     """
-    parser = argparse.ArgumentParser(description="Disrtibuted training with FSDP or DDP.")
-    parser.add_argument("--mode", type=str, required=True, metavar="M",
-                        choices=["fsdp", "ddp", "fsdp2"],
-                        help="mode to set which distributed training to use (fsdp - for FSDP, ddp - for DDP, fsdp2 - for FSDP2)")
-    parser.add_argument("--precision", type=str, default="float32", metavar="P",
-                        choices=["float32", "bfloat16", "float16"],
-                        help="precision to use for training (default: float32)")
-    parser.add_argument("--batch_size", type=int, default=None, metavar="B",
-                        help="batch size to use for training (default: use config.yaml batch_size)")
-    args = parser.parse_args()
 
     # Load configuration
     cfg = load_config()
@@ -46,7 +39,7 @@ def main():
     checkpoint_dir = os.path.join(checkpoint_cfg.get('checkpoint_dir', 'experiments/checkpoints'), postfix)
     
     # Initialize distributed training
-    rank, world_size, gpu = init_distributed_mode()
+    rank, world_size, gpu = init_distributed_mode(device=args.device)
     
     # Initialize Weights & Biases (only on rank 0)
     use_wandb = cfg.get("wandb", {}).get("enable", False)
@@ -62,6 +55,9 @@ def main():
         
         if args.batch_size is not None:
             training_cfg['batch_size'] = args.batch_size
+        
+        if args.prefetch_factor is not None:
+            data_cfg['prefetch_factor'] = args.prefetch_factor
 
         if args.precision != "float32":
             training_cfg['batch_size'] = int(1.5 * training_cfg['batch_size'])
@@ -69,7 +65,8 @@ def main():
         if rank == 0 and use_wandb:
             wandb_config = cfg["wandb"]
             config = {
-                "gpu": world_size,
+                "device": args.device,
+                "world_size": world_size,
                 "mode": args.mode,
                 "checkpoint_path": checkpoint_dir,
                 **training_cfg
@@ -80,16 +77,26 @@ def main():
         model = Model(**model_cfg['config'], num_classes=model_cfg.get('num_classes', 172))
 
         if args.mode == "fsdp":
-            model = prepare_fsdp_model(model=model, device_id=gpu, config=training_cfg['fsdp'], world_size=world_size)
+            model = prepare_fsdp_model(model=model, device_id=gpu, config=training_cfg['fsdp'], world_size=world_size, device=args.device)
             print("[INFO] FSDP model initialzed")
         elif args.mode == "fsdp2":
-            model = prepare_fsdp2_model(model=model, device_id=gpu, config=training_cfg['fsdp2'], world_size=world_size)
+            model = prepare_fsdp2_model(model=model, device_id=gpu, config=training_cfg['fsdp2'], world_size=world_size, device=args.device)
             print("[INFO] FSDP2 model initialzed")
         elif args.mode == "ddp":
-            model = prepare_ddp_model(model=model, device_id=gpu, config=training_cfg['ddp'])
+            model = prepare_ddp_model(model=model, device_id=gpu, config=training_cfg['ddp'], world_size=world_size, device=args.device)
             print("[INFO] DDP model initialzed")
         else:
             raise ValueError(f"Invalid mode: {args.mode}")
+        
+        model_summary_string = str(summary(model, input_size=(1, 3, 640, 640), verbose=0))
+        if rank == 0 and wandb_run is not None:
+            summary_table = wandb.Table(columns=["PyTorch Model Summary"], data=[[model_summary_string]])
+            artifact = wandb.Artifact(f"model-architecture-{postfix}", type="model_summary",
+                          description="Summary of the PyTorch model architecture using torchinfo.")
+            artifact.add(summary_table, "model_summary_table")
+            wandb_run.log_artifact(artifact)
+        
+        model = model.to(args.device)
         
         # Get data loaders
         train_loader, val_loader = get_data_loaders(
@@ -117,15 +124,7 @@ def main():
             lambda_box=training_cfg['weights'].get('bbox_loss', 1.5),
             lambda_cls=training_cfg['weights'].get('cls_loss', 1.0)
         )
-        
-        model_summary_string = str(summary(model, input_size=(1, 3, 640, 640), verbose=0))
-        if wandb_run is not None:
-            summary_table = wandb.Table(columns=["PyTorch Model Summary"], data=[[model_summary_string]])
-            artifact = wandb.Artifact(f"model-architecture-{postfix}", type="model_summary",
-                          description="Summary of the PyTorch model architecture using torchinfo.")
-            artifact.add(summary_table, "model_summary_table")
-            wandb_run.log_artifact(artifact)
-        
+
         # Start training
         train(
             model=model,
@@ -135,7 +134,7 @@ def main():
             scheduler=scheduler,
             criterion=criterion,
             num_epochs=training_cfg["epochs"],
-            device=gpu,
+            device=gpu if args.device == "cuda" else "cpu",
             num_classes=model_cfg['num_classes'],
             rank=rank,
             use_wandb=use_wandb,
@@ -148,6 +147,8 @@ def main():
             precision=args.precision
         )
     except Exception as e:
+        # import traceback
+        # traceback.print_exc()
         print("[ERROR] {}".format(str(e)))
     finally:
         # Cleanup
@@ -158,4 +159,20 @@ def main():
         cleanup_distribute_mode()
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Disrtibuted training with FSDP or DDP.")
+    parser.add_argument("--device", type=str, default="cuda", metavar="D",
+                        choices=["cpu", "cuda"],
+                        help="device to use for training (default: cuda)")
+    parser.add_argument("--mode", type=str, required=True, metavar="M",
+                        choices=["fsdp", "ddp", "fsdp2"],
+                        help="mode to set which distributed training to use (fsdp - for FSDP, ddp - for DDP, fsdp2 - for FSDP2)")
+    parser.add_argument("--precision", type=str, default="float32", metavar="P",
+                        choices=["float32", "bfloat16", "float16"],
+                        help="precision to use for training (default: float32)")
+    parser.add_argument("--batch_size", type=int, default=None, metavar="B",
+                        help="batch size to use for training (default: use config.yaml batch_size)")
+    parser.add_argument("--prefetch_factor", type=int, default=None, metavar="F",
+                        help="prefetch factor to use for training (default: use config.yaml prefetch_factor)")
+    args = parser.parse_args()
+    
+    main(args)
