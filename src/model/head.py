@@ -1,3 +1,4 @@
+import math
 import torch
 from torch import nn
 from typing import List
@@ -52,13 +53,26 @@ class Head(nn.Module):
         
         self.cls = nn.ModuleList(
             nn.Sequential(
-                nn.Sequential(Conv(x, x, nn.SiLU(), k=3, p=1, g=x),
+                Conv(x, x, nn.SiLU(), k=3, p=1, g=x),
                 Conv(x, cls, nn.SiLU()),
                 Conv(cls, cls, nn.SiLU(), k=3, p=1, g=cls),
                 Conv(cls, cls, nn.SiLU()),
-                nn.Conv2d(cls, out_channels=self.nc,kernel_size=1)
-            )) for x in filters
+                nn.Conv2d(cls, out_channels=self.nc, kernel_size=1)
+            ) for x in filters
         )
+
+        self.initialize_biases()
+
+    def initialize_biases(self):
+        # Initialize biases for classification to prevent instability at start
+        prior_prob = 1e-2
+        bias_value = math.log(prior_prob / (1 - prior_prob))
+        
+        for module in self.cls:
+            last_layer = module[-1]
+            if isinstance(last_layer, nn.Conv2d):
+                nn.init.constant_(last_layer.bias, bias_value)
+
     
     def forward(self, x):
         """
