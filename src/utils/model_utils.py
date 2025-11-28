@@ -1,6 +1,7 @@
 import math
 import torch
 from torch import nn
+from typing import List
 
 def autopad(k, p=None, d=1):
     if d > 1:

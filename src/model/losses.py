@@ -242,8 +242,8 @@ class YoloDFLQFLoss(nn.Module):
                 
                 target_ltrb = torch.stack([target_l, target_t, target_r, target_b], dim=1)
                 
-                # Clamp targets to [0, reg_max - 0.01]
-                target_ltrb = target_ltrb.clamp(0, self.reg_max - 0.01)
+                # Clamp targets to [0, reg_max - 1 - 0.01]
+                target_ltrb = target_ltrb.clamp(0, self.reg_max - 1 - 0.01)
                 
                 # Compute DFL loss
                 dfl_loss_val = 0.0
