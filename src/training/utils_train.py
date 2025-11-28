@@ -11,9 +11,10 @@ from torch.distributed.fsdp import (
     fully_shard,
     MixedPrecisionPolicy,
 )
+from src.model.model_blocks import Conv
+from src.utils.common import get_num_threads
 from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
 from torch.distributed.fsdp.fully_sharded_data_parallel import MixedPrecision
-from src.model.model_blocks import Conv
 
 def get_optimizer(model: nn.Module, lr: float, weight_decay: float, patience: int, factor: float) -> Tuple[optim.Optimizer, optim.lr_scheduler.ReduceLROnPlateau]:
     """
@@ -54,7 +55,7 @@ def save_checkpoint(model: nn.Module, optimizer: optim.Optimizer, epoch: int, va
     }, checkpoint_file)
     print(f"[INFO] Saved checkpoint at {checkpoint_file}")
 
-def prepare_fsdp_model(model: nn.Module, device_id: int, config: Dict[str, Union[str, int]], world_size: int) -> nn.Module:
+def prepare_fsdp_model(model: nn.Module, device_id: int, config: Dict[str, Union[str, int]], world_size: int, device: str) -> nn.Module:
     """
     Wraps the model with PyTorch's FullyShardedDataParallel (FSDP1) for distributed training.
     
@@ -66,14 +67,19 @@ def prepare_fsdp_model(model: nn.Module, device_id: int, config: Dict[str, Union
         config (Dict[str, Union[str, int]]): Configuration dictionary containing parameters for 'precision', 
                                              'auto_wrap_policy_min_params', and 'sharding_strategy'.
         world_size (int): The total number of processes involved in the distributed training.
+        device (str): The device to use for training.
 
     Returns:
         nn.Module: The FSDP-wrapped model.
     """
-    torch.cuda.set_device(device_id)
+
+    if device == "cuda":
+        torch.cuda.set_device(device_id)
+    elif device == "cpu":
+        torch.set_num_threads(get_num_threads(world_size))
     
     mixed_precision = None
-    if config['precision'] in ("bfloat16", "float16", "float32"):
+    if config['precision'] in ("bfloat16", "float16"):
         print("[INFO] Setting up precision - {}".format(config['precision']))
         mixed_precision = MixedPrecision(
             param_dtype=getattr(torch, config['precision']),
@@ -97,12 +103,12 @@ def prepare_fsdp_model(model: nn.Module, device_id: int, config: Dict[str, Union
         sharding_strategy=sharding_strategy,
         mixed_precision=mixed_precision,
         use_orig_params=True,
-        device_id=device_id
-    )
+        device_id=device_id if device == "cuda" else None
+    ).to(device)
 
     return model
 
-def prepare_fsdp2_model(model: nn.Module, device_id: int, config: Dict[str, Union[str, int]], world_size: int) -> nn.Module:
+def prepare_fsdp2_model(model: nn.Module, device_id: int, config: Dict[str, Union[str, int]], world_size: int, device: str) -> nn.Module:
     """
     Wraps the model using PyTorch's FSDP2 (per-layer fully_shard) for optimized distributed training.
 
@@ -120,15 +126,20 @@ def prepare_fsdp2_model(model: nn.Module, device_id: int, config: Dict[str, Unio
                                              (e.g., "bfloat16", "float16", "float32).
         world_size (int): The total number of processes involved (unused in this specific implementation 
                           but kept for interface consistency).
+        device (str): The device to use for training.
 
     Returns:
         nn.Module: The FSDP2-wrapped model, with layers individually sharded.
     """
-    if torch.cuda.is_available():
+    if device == "cuda":
         torch.cuda.set_device(device_id)
+    elif device == "cpu":
+        torch.set_num_threads(get_num_threads(world_size))
+
+    model = model.to(device_id if device == "cuda" else device)
 
     mp_policy = None
-    if config.get('precision') in ("bfloat16", "float16", "float32"):
+    if config.get('precision') in ("bfloat16", "float16"):
         dtype = getattr(torch, config['precision'])
         mp_policy = MixedPrecisionPolicy(param_dtype=dtype, reduce_dtype=dtype, cast_forward_inputs=True)
         
@@ -141,12 +152,10 @@ def prepare_fsdp2_model(model: nn.Module, device_id: int, config: Dict[str, Unio
             fully_shard(module, mp_policy=mp_policy, reshard_after_forward=True)
 
     fully_shard(model, mp_policy=mp_policy, reshard_after_forward=True)
-
-    model = model.to(device_id)
     
     return model
 
-def prepare_ddp_model(model: nn.Module, device_id: int, config: Dict[str, Union[str, int]]) -> nn.Module:
+def prepare_ddp_model(model: nn.Module, device_id: int, config: Dict[str, Union[str, int]], world_size: int, device: str) -> nn.Module:
     """
     Wraps the model with PyTorch's DistributedDataParallel (DDP) for distributed training.
 
@@ -154,14 +163,21 @@ def prepare_ddp_model(model: nn.Module, device_id: int, config: Dict[str, Union[
         model (nn.Module): The PyTorch model to wrap.
         device_id (int): The GPU device ID to use for this process.
         config (Dict[str, Union[str, int]]): Configuration dictionary.
+        world_size (int): The total number of processes involved in the distributed training.
+        device (str): The device to use for training.
 
     Returns:
         nn.Module: The DDP-wrapped model.
     """
-    torch.cuda.set_device(device_id)
-    model = model.to(device_id)
+    if device == "cuda":
+        torch.cuda.set_device(device_id)
+    elif device == "cpu":
+        torch.set_num_threads(get_num_threads(world_size))
+    
+    model = model.to(device_id if device == "cuda" else device)
 
     find_unused_parameters = config.get('find_unused_parameters', False) if config else False
 
-    model = DDP(model, device_ids=[device_id], find_unused_parameters=find_unused_parameters)
+    model = DDP(model, device_ids=[device_id] if device == "cuda" else None, find_unused_parameters=find_unused_parameters)
+    
     return model

@@ -1,8 +1,9 @@
 import os
 import torch
 import torch.distributed as dist
+from typing import Optional, Union
 
-def init_distributed_mode():
+def init_distributed_mode(device: str):
     if "RANK" in os.environ and "WORLD_SIZE" in os.environ:
         rank = int(os.environ["RANK"])
         world_size = int(os.environ["WORLD_SIZE"])
@@ -11,15 +12,20 @@ def init_distributed_mode():
         print("[WARNING] Not using distributed mode")
         rank, world_size, gpu = 0, 1, 0
 
-    torch.cuda.set_device(gpu)
+    if device == "cuda":
+        torch.cuda.set_device(gpu)
+
     dist.init_process_group(
-        backend="nccl", init_method="env://", world_size=world_size, rank=rank
+        backend="nccl" if device == "cuda" else "gloo", init_method="env://", world_size=world_size, rank=rank
     )
-    dist.barrier(device_ids=[int(rank)])
+    if device == "cuda":
+        dist.barrier(device_ids=[int(rank)])
+    else:
+        dist.barrier()
     print("[INFO] Distributed process group initialized")
     return rank, world_size, gpu
 
-def reduce_value(value, average=True):
+def reduce_value(value: Union[float, torch.Tensor], average: bool = True) -> Union[float, torch.Tensor]:
     """
     Reduces the value across all processes.
     
@@ -28,7 +34,7 @@ def reduce_value(value, average=True):
         average (bool): If True, returns the average. If False, returns the sum.
     
     Returns:
-        float: Reduced value
+        float or torch.Tensor: Reduced value
     """
     if not dist.is_initialized():
         return value
@@ -40,9 +46,14 @@ def reduce_value(value, average=True):
     with torch.no_grad():
         # Convert float to tensor if needed
         if not isinstance(value, torch.Tensor):
-            value = torch.tensor(value).cuda()
-        elif not value.is_cuda:
-            value = value.cuda()
+            value = torch.tensor(value)
+            # Move to current device if available, else stay on CPU
+            if torch.cuda.is_available() and dist.get_backend() == "nccl":
+                 value = value.cuda()
+        
+        # Let's check if we need to move it.
+        if dist.get_backend() == "nccl" and not value.is_cuda:
+             value = value.cuda()
             
         dist.all_reduce(value)
         

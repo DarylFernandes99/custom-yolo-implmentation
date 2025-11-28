@@ -191,7 +191,7 @@ def train(
     scaler = None
     
     if use_amp and precision == "float16":
-        if distributed_mode.startswith("fsdp"):
+        if distributed_mode.startswith("fsdp") and device == "cuda":
             if ShardedGradScaler is not None:
                 scaler = ShardedGradScaler()
                 if rank == 0:
@@ -203,7 +203,7 @@ def train(
         else:
             scaler = GradScaler(device)
             if rank == 0:
-                print("[INFO] Initialized GradScaler for DDP float16 training")
+                print(f"[INFO] Initialized GradScaler for {distributed_mode} float16 training on {device}")
     elif use_amp and precision == "bfloat16" and rank == 0:
         print("[INFO] Using bfloat16 precision (no scaler needed)")
 
