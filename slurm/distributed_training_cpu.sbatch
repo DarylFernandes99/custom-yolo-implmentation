@@ -14,6 +14,7 @@ MODE=${2:-"None"}
 PRECISION=${3:-"None"}
 BATCH_SIZE=${4:-"None"}
 PREFETCH_FACTOR=${5:-"None"}
+DATASET_PERCENT=${6:-"None"}
 
 # Create directory for logs (Slurm provides these variables)
 mkdir -p "./slurm/logs/${SLURM_JOB_NAME}.${SLURM_JOB_ID}"
@@ -73,6 +74,9 @@ if [ "$BATCH_SIZE" != "None" ]; then
 fi
 if [ "$PREFETCH_FACTOR" != "None" ]; then
     CMD_ARGS="$CMD_ARGS --prefetch_factor $PREFETCH_FACTOR"
+fi
+if [ "$DATASET_PERCENT" != "None" ]; then
+    CMD_ARGS="$CMD_ARGS --dataset_percent $DATASET_PERCENT"
 fi
 torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:$AVAILABLE_PORT --nproc_per_node=$WORLD_SIZE scripts/distributed_training.py $CMD_ARGS --device cpu
 
