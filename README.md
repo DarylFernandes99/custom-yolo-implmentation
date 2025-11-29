@@ -15,13 +15,40 @@ conda env create -f environment.yml
 conda activate hpc_project
 ```
 
-## Run SLURM script
-```bash
-# For data preprocessing
-sbatch slurm/data_preprocess.sbatch <mode [train or val]>
+# Start distributed training
+```
+torchrun \ 
+    --nproc_per_node=<world_size> \
+    scripts/distributed_training.py \
+    $CMD_ARGS \
+    --device <device [cpu or cuda]> \
+    --precision <precision [bfloat16 or float16]> \
+    --batch_size <batch_size> \
+    --prefetch_factor <prefetch_factor>
+```
 
-# For FSDP Training
-sbatch --export=WANDB_API_KEY="<enter_wandb_api_key>" slurm/fsdp_training.sbatch
+## Run SLURM script
+### For distributed training using CPUs
+```bash
+sbatch \ 
+    --export=WANDB_API_KEY="<enter_wandb_api_key>" \ 
+    slurm/distributed_training_cpu.sbatch \
+    <world_size default=1> \ 
+    <mode [train or val]> \ 
+    <precision [bfloat16 or float16]> \ 
+    <batch_size> \ 
+    <prefetch_factor>
+```
+
+### For distributed training using GPUs
+```bash
+sbatch \ 
+    --export=WANDB_API_KEY="<enter_wandb_api_key>" \ 
+    slurm/distributed_training_gpu.sbatch \ 
+    <mode [train or val]> \ 
+    <precision [bfloat16 or float16]> \ 
+    <batch_size> \ 
+    <prefetch_factor>
 ```
 
 References:
