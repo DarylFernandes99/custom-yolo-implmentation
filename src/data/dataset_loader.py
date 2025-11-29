@@ -17,15 +17,19 @@ class DetectionDataset(Dataset):
     Each row in the Parquet file corresponds to one image.
     """
 
-    def __init__(self, parquet_path, image_dir, transform=None, is_test=False):
+    def __init__(self, parquet_path, image_dir, transform=None, is_test=False, percent: float = 1.0):
         """
         Args:
             parquet_path (str): Path to the parquet file (train/val).
             image_dir (str): Directory where the image files (.jpg) are stored.
             transform (callable, optional): Torchvision transforms to apply.
+            is_test (bool, optional): Whether to use the test set (default: False).
+            percent (float, optional): Percent of the dataset to use for training (default: 1.0).
         """
         # Load parquet file into memory (each row = one image)
         self.df = pd.read_parquet(parquet_path)
+        self.df = self.df.sample(frac=percent)
+        print("[INFO] Using {:0.2f}% of the dataset".format(percent*100))
         print("[INFO] Loaded parquet file - {}".format(parquet_path))
         if is_test:
             self.df = self.df.head(20)

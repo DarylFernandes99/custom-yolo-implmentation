@@ -106,7 +106,8 @@ def main(args):
             val_images=data_cfg['val_images'],
             batch_size=training_cfg['batch_size'],
             is_test=training_cfg['is_test'],
-            prefetch_factor=data_cfg.get('prefetch_factor', 2)
+            prefetch_factor=data_cfg.get('prefetch_factor', 2),
+            percent=args.dataset_percent
         )
         
         # Setup optimizer and scheduler
@@ -173,6 +174,9 @@ if __name__ == "__main__":
                         help="batch size to use for training (default: use config.yaml batch_size)")
     parser.add_argument("--prefetch_factor", type=int, default=None, metavar="F",
                         help="prefetch factor to use for training (default: use config.yaml prefetch_factor)")
+    # add a argument to get the percent of the dataset to use for training
+    parser.add_argument("--dataset_percent", type=float, default=1.0, metavar="DP",
+                        help="percent of the dataset to use for training (default: 1.0)")
     args = parser.parse_args()
     
     main(args)
