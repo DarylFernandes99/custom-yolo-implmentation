@@ -8,7 +8,7 @@ from src.data.collate import collate_fn
 from src.data.dataset_loader import DetectionDataset
 from src.data.transforms import get_train_transforms, get_val_transforms
 
-def get_data_loaders(train_parquet: str, val_parquet: str, train_images: str, val_images: str, batch_size: int, is_test: bool = False, prefetch_factor: int = 2, percent: float = 1.0) -> Tuple[DataLoader, DataLoader]:
+def get_data_loaders(train_parquet: str, val_parquet: str, train_images: str, val_images: str, batch_size: int, is_test: bool = False, prefetch_factor: int = 2, percent: float = 1.0, device: str = "cpu") -> Tuple[DataLoader, DataLoader]:
     num_workers = get_num_workers()
 
     train_dataset = DetectionDataset(train_parquet, train_images, get_train_transforms(), is_test, percent)
@@ -30,7 +30,7 @@ def get_data_loaders(train_parquet: str, val_parquet: str, train_images: str, va
         shuffle=(train_sampler is None),
         sampler=train_sampler,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=True if device == "cuda" else False,
         prefetch_factor=prefetch_factor,
         collate_fn=collate_fn,
         drop_last=True
@@ -43,7 +43,7 @@ def get_data_loaders(train_parquet: str, val_parquet: str, train_images: str, va
         shuffle=False,
         sampler=val_sampler,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=True if device == "cuda" else False,
         prefetch_factor=prefetch_factor,
         collate_fn=collate_fn
     )
