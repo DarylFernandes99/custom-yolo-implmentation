@@ -8,11 +8,11 @@ from src.data.collate import collate_fn
 from src.data.dataset_loader import DetectionDataset
 from src.data.transforms import get_train_transforms, get_val_transforms
 
-def get_data_loaders(train_parquet: str, val_parquet: str, train_images: str, val_images: str, batch_size: int, is_test: bool = False, prefetch_factor: int = 2) -> Tuple[DataLoader, DataLoader]:
+def get_data_loaders(train_parquet: str, val_parquet: str, train_images: str, val_images: str, batch_size: int, is_test: bool = False, prefetch_factor: int = 2, percent: float = 1.0) -> Tuple[DataLoader, DataLoader]:
     num_workers = get_num_workers()
 
-    train_dataset = DetectionDataset(train_parquet, train_images, get_train_transforms(), is_test)
-    val_dataset = DetectionDataset(val_parquet, val_images, get_val_transforms(), is_test)
+    train_dataset = DetectionDataset(train_parquet, train_images, get_train_transforms(), is_test, percent)
+    val_dataset = DetectionDataset(val_parquet, val_images, get_val_transforms(), is_test, percent)
 
     is_distributed = torch.distributed.is_initialized()
 
