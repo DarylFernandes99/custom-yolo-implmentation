@@ -13,6 +13,7 @@
 MODE=${1:-"None"}
 PRECISION=${2:-"None"}
 BATCH_SIZE=${3:-"None"}
+PREFETCH_FACTOR=${4:-"None"}
 
 # Create directory for logs (Slurm provides these variables)
 mkdir -p "./slurm/logs/${SLURM_JOB_NAME}.${SLURM_JOB_ID}"
@@ -70,7 +71,10 @@ fi
 if [ "$BATCH_SIZE" != "None" ]; then
     CMD_ARGS="$CMD_ARGS --batch_size $BATCH_SIZE"
 fi
-torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:$AVAILABLE_PORT --nproc_per_node=$SLURM_GPUS_ON_NODE scripts/distributed_training.py $CMD_ARGS
+if [ "$PREFETCH_FACTOR" != "None" ]; then
+    CMD_ARGS="$CMD_ARGS --prefetch_factor $PREFETCH_FACTOR"
+fi
+torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:$AVAILABLE_PORT --nproc_per_node=$SLURM_GPUS_ON_NODE scripts/distributed_training.py $CMD_ARGS --device cuda
 
 # Deactivate the environment
 conda deactivate
