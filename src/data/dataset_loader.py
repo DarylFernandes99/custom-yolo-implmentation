@@ -47,6 +47,7 @@ class DetectionDataset(Dataset):
         boxes = torch.from_numpy(np.array(row["bbox"].tolist(), dtype=np.float32))
         labels = torch.from_numpy(np.array(row["category_id"].tolist(), dtype=np.float32))
         labels = labels.unsqueeze(-1).reshape(labels.shape[0], 1)
+        name = row["name"]
 
         boxes = tv_tensors.BoundingBoxes(
             boxes,
@@ -61,7 +62,7 @@ class DetectionDataset(Dataset):
         target = {
             "boxes": boxes,
             "labels": labels,
-            "image_id": torch.tensor([idx])
+            "image_id": torch.tensor([idx]), 
         }
 
         # Apply transforms
@@ -70,5 +71,6 @@ class DetectionDataset(Dataset):
         
         target['boxes'] = torch.cat([target['boxes'], target['labels']], dim=1)
         del target['labels']
+        target['name'] = name
 
         return image, target
