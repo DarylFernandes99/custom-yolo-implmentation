@@ -59,9 +59,6 @@ def main(args):
         if args.prefetch_factor is not None:
             data_cfg['prefetch_factor'] = args.prefetch_factor
 
-        if args.precision != "float32":
-            training_cfg['batch_size'] = int(1.5 * training_cfg['batch_size'])
-
         if rank == 0 and use_wandb:
             wandb_config = cfg["wandb"]
             config = {
