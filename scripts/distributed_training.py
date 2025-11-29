@@ -104,7 +104,8 @@ def main(args):
             batch_size=training_cfg['batch_size'],
             is_test=training_cfg['is_test'],
             prefetch_factor=data_cfg.get('prefetch_factor', 2),
-            percent=args.dataset_percent
+            percent=args.dataset_percent,
+            device=args.device
         )
         
         # Setup optimizer and scheduler
