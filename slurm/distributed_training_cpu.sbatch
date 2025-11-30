@@ -9,12 +9,18 @@
 #SBATCH --error=./slurm/logs/%x.%j/error.err
 #SBATCH --partition=courses
 
-WORLD_SIZE=${1:-"1"}
-MODE=${2:-"None"}
-PRECISION=${3:-"None"}
-BATCH_SIZE=${4:-"None"}
-PREFETCH_FACTOR=${5:-"None"}
-DATASET_PERCENT=${6:-"None"}
+# Default value for World Size is 1
+WORLD_SIZE="1"
+# Default value for Mode is None
+MODE="None"
+# Default value for Precision is None
+PRECISION="None"
+# Default value for Batch Size is None
+BATCH_SIZE="None"
+# Default value for Prefetch Factor is None
+PREFETCH_FACTOR="None"
+# Default value for Dataset Percent is None
+DATASET_PERCENT="None"
 
 # Create directory for logs (Slurm provides these variables)
 mkdir -p "./slurm/logs/${SLURM_JOB_NAME}.${SLURM_JOB_ID}"
@@ -78,7 +84,11 @@ fi
 if [ "$DATASET_PERCENT" != "None" ]; then
     CMD_ARGS="$CMD_ARGS --dataset_percent $DATASET_PERCENT"
 fi
-torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:$AVAILABLE_PORT --nproc_per_node=$WORLD_SIZE scripts/distributed_training.py $CMD_ARGS --device cpu
+torchrun \
+    --rdzv-backend=c10d \
+    --rdzv-endpoint=localhost:$AVAILABLE_PORT \
+    --nproc_per_node=$WORLD_SIZE \
+    scripts/distributed_training.py --device cpu $CMD_ARGS
 
 # Deactivate the environment
 conda deactivate

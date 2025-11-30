@@ -10,11 +10,16 @@
 #SBATCH --error=./slurm/logs/%x.%j/error.err
 #SBATCH --partition=gpu
 
-MODE=${1:-"None"}
-PRECISION=${2:-"None"}
-BATCH_SIZE=${3:-"None"}
-PREFETCH_FACTOR=${4:-"None"}
-DATASET_PERCENT=${5:-"None"}
+# Default value for Mode is None
+MODE="None"
+# Default value for Precision is None
+PRECISION="None"
+# Default value for Batch Size is None
+BATCH_SIZE="None"
+# Default value for Prefetch Factor is None
+PREFETCH_FACTOR="None"
+# Default value for Dataset Percent is None
+DATASET_PERCENT="None"
 
 # Create directory for logs (Slurm provides these variables)
 mkdir -p "./slurm/logs/${SLURM_JOB_NAME}.${SLURM_JOB_ID}"
@@ -78,7 +83,11 @@ fi
 if [ "$DATASET_PERCENT" != "None" ]; then
     CMD_ARGS="$CMD_ARGS --dataset_percent $DATASET_PERCENT"
 fi
-torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:$AVAILABLE_PORT --nproc_per_node=$SLURM_GPUS_ON_NODE scripts/distributed_training.py $CMD_ARGS --device cuda
+torchrun \
+    --rdzv-backend=c10d \
+    --rdzv-endpoint=localhost:$AVAILABLE_PORT \
+    --nproc_per_node=$SLURM_GPUS_ON_NODE \
+    scripts/distributed_training.py --device cuda $CMD_ARGS
 
 # Deactivate the environment
 conda deactivate
