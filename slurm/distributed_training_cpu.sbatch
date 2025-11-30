@@ -25,8 +25,8 @@ DATASET_PERCENT="None"
 # Create directory for logs (Slurm provides these variables)
 mkdir -p "./slurm/logs/${SLURM_JOB_NAME}.${SLURM_JOB_ID}"
 
-# Load necessary modules (CUDA, Anaconda)
-module load cuda/12.3.0 anaconda3/2024.06
+# Load necessary modules (Anaconda)
+module load anaconda3/2024.06
 
 # activate conda enironment
 source activate hpc_project
