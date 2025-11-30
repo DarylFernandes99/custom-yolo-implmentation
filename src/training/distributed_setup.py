@@ -49,11 +49,11 @@ def reduce_value(value: Union[float, torch.Tensor], average: bool = True) -> Uni
             value = torch.tensor(value)
             # Move to current device if available, else stay on CPU
             if torch.cuda.is_available() and dist.get_backend() == "nccl":
-                 value = value.cuda()
+                value = value.cuda()
         
         # Let's check if we need to move it.
         if dist.get_backend() == "nccl" and not value.is_cuda:
-             value = value.cuda()
+            value = value.cuda()
             
         dist.all_reduce(value)
         

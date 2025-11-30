@@ -238,7 +238,7 @@ def train(
             enable_autocast = (distributed_mode == "ddp" and use_amp)
             amp_dtype = torch.bfloat16 if precision == "bfloat16" else torch.float16
             
-            with torch.autocast(device_type="cuda", dtype=amp_dtype, enabled=enable_autocast):
+            with torch.autocast(device_type="cpu" if device == "cpu" else "cuda", dtype=amp_dtype, enabled=enable_autocast):
                 preds, anchors, strides = model(images)
                 loss, loss_dict = criterion(preds, gt_box, anchors, strides)
             
@@ -308,7 +308,7 @@ def train(
                 enable_autocast = (distributed_mode == "ddp" and use_amp)
                 amp_dtype = torch.bfloat16 if precision == "bfloat16" else torch.float16
 
-                with torch.autocast(device_type="cuda", dtype=amp_dtype, enabled=enable_autocast):
+                with torch.autocast(device_type="cpu" if device == "cpu" else "cuda", dtype=amp_dtype, enabled=enable_autocast):
                     preds, anchors, strides = model(images)
                     loss, loss_dict = criterion(preds, gt_box, anchors, strides)
                 
