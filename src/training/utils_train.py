@@ -13,6 +13,7 @@ from torch.distributed.fsdp import (
 )
 from src.model.model_blocks import Conv
 from src.utils.common import get_num_threads
+from torch.distributed.device_mesh import init_device_mesh
 from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
 from torch.distributed.fsdp.fully_sharded_data_parallel import MixedPrecision
 
@@ -97,13 +98,18 @@ def prepare_fsdp_model(model: nn.Module, device_id: int, config: Dict[str, Union
     if world_size != 1 and config['sharding_strategy'] in ("FULLY_SHARD", "SHARD_GROUP_OP", "HYBRID_SHARD", "_HYBRID_SHARD_ZERO2"):
         sharding_strategy = ShardingStrategy[config['sharding_strategy']]
 
+    # Create DeviceMesh
+    mesh_device_type = "cuda" if device == "cuda" else "cpu"
+    mesh = init_device_mesh(mesh_device_type, (world_size,))
+
     model = FSDP(
         model,
         auto_wrap_policy=auto_wrap_policy,
         sharding_strategy=sharding_strategy,
         mixed_precision=mixed_precision,
         use_orig_params=True,
-        device_id=device_id if device == "cuda" else None
+        device_id=device_id if device == "cuda" else torch.device("cpu"),
+        device_mesh=mesh
     ).to(device)
 
     return model
@@ -138,7 +144,7 @@ def prepare_fsdp2_model(model: nn.Module, device_id: int, config: Dict[str, Unio
 
     model = model.to(device_id if device == "cuda" else device)
 
-    mp_policy = None
+    mp_policy = MixedPrecisionPolicy(param_dtype=None, reduce_dtype=None, cast_forward_inputs=True)
     if config.get('precision') in ("bfloat16", "float16"):
         dtype = getattr(torch, config['precision'])
         mp_policy = MixedPrecisionPolicy(param_dtype=dtype, reduce_dtype=dtype, cast_forward_inputs=True)
@@ -147,11 +153,15 @@ def prepare_fsdp2_model(model: nn.Module, device_id: int, config: Dict[str, Unio
         for buffer in model.buffers():
             buffer.data = buffer.data.to(dtype=dtype)
 
+    # Create DeviceMesh
+    mesh_device_type = "cuda" if device == "cuda" else "cpu"
+    mesh = init_device_mesh(mesh_device_type, (world_size,))
+
     for module in reversed(list(model.modules())):
         if isinstance(module, (Conv, nn.MaxPool2d)):
-            fully_shard(module, mp_policy=mp_policy, reshard_after_forward=True)
+            fully_shard(module, mp_policy=mp_policy, reshard_after_forward=True, mesh=mesh)
 
-    fully_shard(model, mp_policy=mp_policy, reshard_after_forward=True)
+    fully_shard(model, mp_policy=mp_policy, reshard_after_forward=True, mesh=mesh)
     
     return model
 

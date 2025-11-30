@@ -68,7 +68,7 @@ def main(args):
                 "checkpoint_path": checkpoint_dir,
                 **training_cfg
             }
-            wandb_run = setup_wandb(config=config, wandb_config=wandb_config, mode=args.mode)
+            wandb_run = setup_wandb(config=config, wandb_config=wandb_config, args=args)
         
         # Create model
         model = Model(**model_cfg['config'], num_classes=model_cfg.get('num_classes', 172))
@@ -85,11 +85,13 @@ def main(args):
         else:
             raise ValueError(f"Invalid mode: {args.mode}")
         
-        model_summary_string = str(summary(model, input_size=(1, 3, 640, 640), verbose=0))
+        model_summary_string = str(summary(model, input_size=(1, 3, 640, 640), verbose=0, device=args.device))
         if rank == 0 and wandb_run is not None:
             summary_table = wandb.Table(columns=["PyTorch Model Summary"], data=[[model_summary_string]])
-            artifact = wandb.Artifact(f"model-architecture-{postfix}", type="model_summary",
-                          description="Summary of the PyTorch model architecture using torchinfo.")
+            artifact = wandb.Artifact(
+                f"model-architecture-{postfix}", type="model_summary",
+                description="Summary of the PyTorch model architecture using torchinfo."
+            )
             artifact.add(summary_table, "model_summary_table")
             wandb_run.log_artifact(artifact)
         
@@ -146,8 +148,8 @@ def main(args):
             precision=args.precision
         )
     except Exception as e:
-        # import traceback
-        # traceback.print_exc()
+        import traceback
+        traceback.print_exc()
         print("[ERROR] {}".format(str(e)))
     finally:
         # Cleanup
@@ -166,7 +168,7 @@ if __name__ == "__main__":
                         choices=["fsdp", "ddp", "fsdp2"],
                         help="mode to set which distributed training to use (fsdp - for FSDP, ddp - for DDP, fsdp2 - for FSDP2)")
     parser.add_argument("--precision", type=str, default="float32", metavar="P",
-                        choices=["float32", "bfloat16", "float16"],
+                        choices=["bfloat16", "float16", "float32"],
                         help="precision to use for training (default: float32)")
     parser.add_argument("--batch_size", type=int, default=None, metavar="B",
                         help="batch size to use for training (default: use config.yaml batch_size)")
