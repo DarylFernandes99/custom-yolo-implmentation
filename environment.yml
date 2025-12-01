@@ -19,6 +19,7 @@ dependencies:
   - ipykernel
   - jupyterlab
   - conda-forge::ijson
+  - seaborn==0.13.2
   - pip==25.3
   - pip:
     - --extra-index-url https://download.pytorch.org/whl/cu126
