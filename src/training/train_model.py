@@ -377,6 +377,6 @@ def train(
             tqdm.write(f"  Train - Total: {avg_train_loss:.4f} | Box: {avg_train_box:.4f} | Cls: {avg_train_cls:.4f}")
             tqdm.write(f"  Val   - Total: {avg_val_loss:.4f} | Box: {avg_val_box:.4f} | Cls: {avg_val_cls:.4f}")
             tqdm.write(f"  Metrics - Precision: {metrics_dict['precision']:.4f} | Recall: {metrics_dict['recall']:.4f} | F1: {metrics_dict['f1_score']:.4f} | mAP: {metrics_dict['mAP']:.4f}")
-            tqdm.write(f"  Detection - TP: {metrics_dict['true_positives']} | FP: {metrics_dict['false_positives']} | FN: {metrics_dict['false_negatives']}")
+            tqdm.write(f"  Detection - TP: {metrics_dict['true_positives']} | FP: {metrics_dict['false_positives']} | FN: {metrics_dict['false_negatives']} | GT: {metrics_dict['ground_truth']}")
             tqdm.write(f"  LR: {optimizer.param_groups[0]['lr']:.6f}")
             tqdm.write(f"{'='*80}\n")
