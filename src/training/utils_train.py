@@ -11,8 +11,8 @@ from torch.distributed.fsdp import (
     fully_shard,
     MixedPrecisionPolicy,
 )
-from src.model.model_blocks import Conv
 from src.utils.common import get_num_threads
+from src.model.model_blocks import C3K2, SPPF, PSA
 from torch.distributed.device_mesh import init_device_mesh
 from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
 from torch.distributed.fsdp.fully_sharded_data_parallel import MixedPrecision
@@ -46,7 +46,6 @@ def save_checkpoint(model: nn.Module, optimizer: optim.Optimizer, epoch: int, va
         val_loss (float): The validation loss at the current epoch.
         checkpoint_dir (str, optional): Directory where checkpoints will be saved. Defaults to "experiments/checkpoints".
     """
-    os.makedirs(checkpoint_dir, exist_ok=True)
     checkpoint_file = f"{checkpoint_dir}/model_epoch_{epoch}.pth"
     torch.save({
         "epoch": epoch,
@@ -158,7 +157,7 @@ def prepare_fsdp2_model(model: nn.Module, device_id: int, config: Dict[str, Unio
     mesh = init_device_mesh(mesh_device_type, (world_size,))
 
     for module in reversed(list(model.modules())):
-        if isinstance(module, (Conv, nn.MaxPool2d)):
+        if isinstance(module, (C3K2, SPPF, PSA)):
             fully_shard(module, mp_policy=mp_policy, reshard_after_forward=True, mesh=mesh)
 
     fully_shard(model, mp_policy=mp_policy, reshard_after_forward=True, mesh=mesh)

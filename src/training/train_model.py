@@ -149,6 +149,7 @@ def train(
     optimizer,
     scheduler,
     criterion,
+    initial_epoch,
     num_epochs,
     device,
     num_classes=171,
@@ -172,6 +173,7 @@ def train(
         optimizer: Optimizer for model parameters
         scheduler: Learning rate scheduler
         criterion: Loss function
+        initial_epoch: Initial epoch for training
         num_epochs: Number of training epochs
         device: Device to train on (cuda:0, cpu, etc.)
         num_classes: Number of object classes
@@ -213,7 +215,7 @@ def train(
         iou_threshold=iou_threshold
     )
     
-    for epoch in range(num_epochs):
+    for epoch in range(initial_epoch, num_epochs):
         # ============ TRAINING ============
         if hasattr(train_loader.sampler, "set_epoch"):
             train_loader.sampler.set_epoch(epoch)
@@ -369,7 +371,7 @@ def train(
                     "lr": optimizer.param_groups[0]["lr"]
                 })
             
-            save_checkpoint(model, optimizer, epoch, avg_val_loss, checkpoint_dir=checkpoint_dir)
+            save_checkpoint(model, optimizer, epoch+1, avg_val_loss, checkpoint_dir=checkpoint_dir)
             
             # Display epoch summary using tqdm.write (doesn't interrupt progress bars)
             tqdm.write(f"{'='*80}")
@@ -377,6 +379,6 @@ def train(
             tqdm.write(f"  Train - Total: {avg_train_loss:.4f} | Box: {avg_train_box:.4f} | Cls: {avg_train_cls:.4f}")
             tqdm.write(f"  Val   - Total: {avg_val_loss:.4f} | Box: {avg_val_box:.4f} | Cls: {avg_val_cls:.4f}")
             tqdm.write(f"  Metrics - Precision: {metrics_dict['precision']:.4f} | Recall: {metrics_dict['recall']:.4f} | F1: {metrics_dict['f1_score']:.4f} | mAP: {metrics_dict['mAP']:.4f}")
-            tqdm.write(f"  Detection - TP: {metrics_dict['true_positives']} | FP: {metrics_dict['false_positives']} | FN: {metrics_dict['false_negatives']} | GT: {metrics_dict['ground_truth']}")
+            tqdm.write(f"  Detection - TP: {metrics_dict['true_positives']} | FP: {metrics_dict['false_positives']} | FN: {metrics_dict['false_negatives']}")
             tqdm.write(f"  LR: {optimizer.param_groups[0]['lr']:.6f}")
             tqdm.write(f"{'='*80}\n")

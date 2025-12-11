@@ -3,6 +3,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import io
 import time
+import json
 import torch
 import wandb
 import argparse
@@ -17,6 +18,7 @@ from src.utils.config_loader import load_config
 from src.training.wandb_setup import setup_wandb
 from src.data.data_loader import get_data_loaders
 from src.training.utils_train import get_optimizer
+from src.utils.common import get_checkpoint_config, find_latest_checkpoint
 from src.training.distributed_setup import init_distributed_mode, cleanup_distribute_mode
 from src.training.utils_train import prepare_fsdp_model, prepare_ddp_model, prepare_fsdp2_model
 
@@ -34,9 +36,30 @@ def main(args):
     training_cfg = cfg["training"]
     model_cfg = cfg["model"]
     checkpoint_cfg = cfg["checkpoint"]
+    initial_epoch = 0
     
     postfix = datetime.now().strftime('%d-%m-%Y--%H-%M-%S')
-    checkpoint_dir = os.path.join(checkpoint_cfg.get('checkpoint_dir', 'experiments/checkpoints'), postfix)
+
+    if args.load_from_checkpoint:
+        checkpoint_dir = os.path.join(checkpoint_cfg.get('checkpoint_dir', 'experiments/checkpoints'), args.load_from_checkpoint)
+        model_cfg_checkpoint = get_checkpoint_config(checkpoint_dir)
+        model_cfg['config'] = model_cfg_checkpoint['config']
+        model_cfg['num_classes'] = model_cfg_checkpoint['num_classes']
+        args.precision = model_cfg_checkpoint['precision']
+        args.mode = model_cfg_checkpoint['mode']
+        print("[INFO] Loaded model config from checkpoint directory: precision = {}, mode = {}".format(args.precision, args.mode))
+    else:
+        checkpoint_dir = os.path.join(checkpoint_cfg.get('checkpoint_dir', 'experiments/checkpoints'), postfix)
+        os.makedirs(checkpoint_dir, exist_ok=True)
+        # save the model config in a json file in the checkpoint directory along with the num_classes
+        with open(os.path.join(checkpoint_dir, "model_config.json"), "w") as f:
+            json.dump({
+                "config": model_cfg['config'],
+                "num_classes": model_cfg.get('num_classes', 172),
+                "mode": args.mode,
+                "precision": args.precision
+            }, f)
+            print("[INFO] Model config saved to checkpoint directory")
     
     # Initialize distributed training
     rank, world_size, gpu = init_distributed_mode(device=args.device)
@@ -71,7 +94,7 @@ def main(args):
             wandb_run = setup_wandb(config=config, wandb_config=wandb_config, args=args)
         
         # Create model
-        model = Model(**model_cfg['config'], num_classes=model_cfg.get('num_classes', 172))
+        model = Model(**model_cfg['config'], num_classes=model_cfg['num_classes'])
 
         if args.mode == "fsdp":
             model = prepare_fsdp_model(model=model, device_id=gpu, config=training_cfg['fsdp'], world_size=world_size, device=args.device)
@@ -119,6 +142,23 @@ def main(args):
             factor=training_cfg['learning_rate_factor']
         )
         
+        # Load checkpoint if specified
+        if args.load_from_checkpoint:
+            # Get the latest checkpoint
+            checkpoint_path = find_latest_checkpoint(checkpoint_dir)
+            checkpoint = torch.load(checkpoint_path, map_location=args.device)
+            
+            # Update initial epoch
+            initial_epoch = checkpoint['epoch']
+            
+            # Load model state
+            model.load_state_dict(checkpoint["model_state"])
+            
+            # Load optimizer state
+            optimizer.load_state_dict(checkpoint['optimizer_state'])
+            
+            print(f"[INFO] Loaded model and optimizer from checkpoint at epoch {checkpoint['epoch']} from {checkpoint_path}")
+        
         # Setup loss criterion
         criterion = YoloDFLQFLoss(
             num_classes=model_cfg['num_classes'],
@@ -134,7 +174,8 @@ def main(args):
             optimizer=optimizer,
             scheduler=scheduler,
             criterion=criterion,
-            num_epochs=training_cfg["epochs"],
+            initial_epoch=initial_epoch,
+            num_epochs=initial_epoch + training_cfg["epochs"],
             device=gpu if args.device == "cuda" else "cpu",
             num_classes=model_cfg['num_classes'],
             rank=rank,
@@ -174,9 +215,10 @@ if __name__ == "__main__":
                         help="batch size to use for training (default: use config.yaml batch_size)")
     parser.add_argument("--prefetch_factor", type=int, default=None, metavar="F",
                         help="prefetch factor to use for training (default: use config.yaml prefetch_factor)")
-    # add a argument to get the percent of the dataset to use for training
     parser.add_argument("--dataset_percent", type=float, default=1.0, metavar="DP",
                         help="percent of the dataset to use for training (default: 1.0)")
+    parser.add_argument("--load_from_checkpoint", type=str, default=None, metavar="LC",
+                        help="checkpoint folder name to load from (default: None)")
     args = parser.parse_args()
     
     main(args)
