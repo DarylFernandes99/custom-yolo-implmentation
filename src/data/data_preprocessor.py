@@ -117,6 +117,7 @@ class DataPreprocess:
                 .drop_duplicates()
         elif key == "categories":
             return ddf.concat(dask_chunks) \
+                .repartition(npartitions=1) \
                 .drop_duplicates() \
                 .sort_values(by=["name"], ignore_index=True) \
                 .reset_index()
@@ -285,13 +286,20 @@ class DataPreprocess:
                             chunk_size=chunk_sizes[1]
                         )
         print("[INFO] Loaded annotations data")
-        combined_catego = data_preprocess.load_annotations_file(
+        category_path = os.path.join(output_dir, "categories.csv")
+        if os.path.isfile(category_path):
+            combined_catego = ddf.read_csv(category_path)
+            print("[INFO] Loaded categories data")
+        else:
+            combined_catego = data_preprocess.load_annotations_file(
                             file_names=file_names,
                             key=keys[2],
                             columns=columns[2],
                             chunk_size=chunk_sizes[2]
                         )
-        print("[INFO] Loaded categories data")
+            
+            combined_catego.to_csv(category_path, single_file=True, index=False)
+            print("[INFO] Exported categories data")
         
         ddf_combined = ddf.merge(left=combined_images, right=combined_annots, how="inner", left_on="id", right_on="image_id", suffixes=("_image", "_annots")) \
                         .merge(combined_catego, how="inner", left_on="category_id", right_on="id", suffixes=("_combined", "categos")) \
