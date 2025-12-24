@@ -133,7 +133,13 @@ class Model(nn.Module):
             box = box * strides
             
             # Concatenate
-            y = torch.cat((box, cls), 1)
+            y = torch.cat((box, cls.sigmoid()), 1)
             
             # NMS
-            return non_max_suppression(y, conf_thres=conf_thres, iou_thres=iou_thres, nc=self.num_classes)
+            preds = non_max_suppression(y, conf_thres=conf_thres, iou_thres=iou_thres, nc=self.num_classes)
+            
+            # Clip boxes to image size (640x640)
+            for i in range(len(preds)):
+                preds[i][:, :4].clamp_(min=0, max=640)
+                
+            return preds

@@ -21,6 +21,8 @@ BATCH_SIZE="None"
 PREFETCH_FACTOR="None"
 # Default value for Dataset Percent is None
 DATASET_PERCENT="None"
+# Default value for Checkpoint is None
+CHECKPOINT_PATH="None"
 
 # Create directory for logs (Slurm provides these variables)
 mkdir -p "./slurm/logs/${SLURM_JOB_NAME}.${SLURM_JOB_ID}"
@@ -83,6 +85,9 @@ if [ "$PREFETCH_FACTOR" != "None" ]; then
 fi
 if [ "$DATASET_PERCENT" != "None" ]; then
     CMD_ARGS="$CMD_ARGS --dataset_percent $DATASET_PERCENT"
+fi
+if [ "$CHECKPOINT_PATH" != "None" ]; then
+    CMD_ARGS="$CMD_ARGS --checkpoint_path $CHECKPOINT_PATH"
 fi
 torchrun \
     --rdzv-backend=c10d \
